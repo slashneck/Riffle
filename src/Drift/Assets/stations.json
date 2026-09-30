@@ -1,0 +1,211 @@
+{
+  "moods": [
+    {
+      "id": "lofi",
+      "name": "Lofi",
+      "stations": [
+        {
+          "id": "nts-lowkey",
+          "name": "Low Key",
+          "blurb": "Lo-fi hip-hop and smooth R&B",
+          "source": "NTS",
+          "stream": "https://stream-mixtape-geo.ntslive.net/mixtape2",
+          "art": "nts:100-percent-hip-hop",
+          "tint": "#7C8CD9",
+          "support": "https://www.nts.live/supporters"
+        },
+        {
+          "id": "soma-fluid",
+          "name": "Fluid",
+          "blurb": "Instrumental hip-hop and future soul",
+          "source": "SomaFM",
+          "playlist": "https://somafm.com/fluid.pls",
+          "stream": "https://ice1.somafm.com/fluid-128-mp3",
+          "art": "lookup",
+          "tint": "#5FB3C9",
+          "support": "https://somafm.com/support/"
+        },
+        {
+          "id": "soma-groovesalad",
+          "name": "Groove Salad",
+          "blurb": "Chilled downtempo beats and grooves",
+          "source": "SomaFM",
+          "playlist": "https://somafm.com/groovesalad.pls",
+          "stream": "https://ice1.somafm.com/groovesalad-128-mp3",
+          "art": "lookup",
+          "tint": "#8CC37A",
+          "support": "https://somafm.com/support/"
+        }
+      ]
+    },
+    {
+      "id": "ambient",
+      "name": "Ambient",
+      "stations": [
+        {
+          "id": "soma-dronezone",
+          "name": "Drone",
+          "fullName": "Drone Zone",
+          "blurb": "Slow atmospheric textures, barely any beats",
+          "source": "SomaFM",
+          "playlist": "https://somafm.com/dronezone.pls",
+          "stream": "https://ice1.somafm.com/dronezone-128-mp3",
+          "art": "lookup",
+          "tint": "#6F8FB8",
+          "support": "https://somafm.com/support/"
+        },
+        {
+          "id": "soma-deepspaceone",
+          "name": "Space",
+          "fullName": "Deep Space One",
+          "blurb": "Deep ambient electronic and space music",
+          "source": "SomaFM",
+          "playlist": "https://somafm.com/deepspaceone.pls",
+          "stream": "https://ice1.somafm.com/deepspaceone-128-mp3",
+          "art": "lookup",
+          "tint": "#6C6FC4",
+          "support": "https://somafm.com/support/"
+        },
+        {
+          "id": "soma-synphaera",
+          "name": "Cosmic",
+          "fullName": "Synphaera",
+          "blurb": "Modern electronic ambient and cosmic synths",
+          "source": "SomaFM",
+          "playlist": "https://somafm.com/synphaera.pls",
+          "stream": "https://ice1.somafm.com/synphaera-128-mp3",
+          "art": "lookup",
+          "tint": "#B07CC9",
+          "support": "https://somafm.com/support/"
+        },
+        {
+          "id": "nts-slowfocus",
+          "name": "Focus",
+          "fullName": "Slow Focus",
+          "blurb": "Beatless ambient, drone and ragas",
+          "source": "NTS",
+          "stream": "https://stream-mixtape-geo.ntslive.net/mixtape",
+          "art": "nts:slow-focus",
+          "tint": "#6FB3A4",
+          "support": "https://www.nts.live/supporters"
+        },
+        {
+          "id": "nts-fieldrecordings",
+          "name": "Nature",
+          "fullName": "Field Recordings",
+          "blurb": "Natural ambience recorded around the world",
+          "source": "NTS",
+          "stream": "https://stream-mixtape-geo.ntslive.net/mixtape23",
+          "art": "nts:field-recordings",
+          "tint": "#7FAE7A",
+          "support": "https://www.nts.live/supporters"
+        }
+      ]
+    },
+    {
+      "id": "jazz",
+      "name": "Jazz",
+      "stations": [
+        {
+          "id": "srg-jazz",
+          "name": "Swiss Jazz",
+          "fullName": "Radio Swiss Jazz",
+          "blurb": "Mellow jazz, soul and blues, no talk",
+          "source": "SRG SSR",
+          "stream": "https://stream.srg-ssr.ch/srgssr/rsj/mp3/128",
+          "art": "lookup",
+          "tint": "#D19A5B",
+          "support": "https://www.radioswissjazz.ch"
+        },
+        {
+          "id": "nts-expansions",
+          "name": "Expansions",
+          "blurb": "Jazz and its mind-expanding variations",
+          "source": "NTS",
+          "stream": "https://stream-mixtape-geo.ntslive.net/mixtape3",
+          "art": "nts:expansions",
+          "tint": "#C77F6B",
+          "support": "https://www.nts.live/supporters"
+        },
+        {
+          "id": "soma-sonicuniverse",
+          "name": "Nu Jazz",
+          "fullName": "Sonic Universe",
+          "blurb": "Eclectic nu jazz and avant grooves",
+          "source": "SomaFM",
+          "playlist": "https://somafm.com/sonicuniverse.pls",
+          "stream": "https://ice1.somafm.com/sonicuniverse-128-mp3",
+          "art": "lookup",
+          "tint": "#D5B35E",
+          "support": "https://somafm.com/support/"
+        }
+      ]
+    },
+    {
+      "id": "mellow",
+      "name": "Mellow",
+      "stations": [
+        {
+          "id": "rp-mellow",
+          "name": "Mellow Mix",
+          "fullName": "Radio Paradise Mellow",
+          "blurb": "Gentle, eclectic and hand picked",
+          "source": "Radio Paradise",
+          "stream": "https://stream.radioparadise.com/mellow-192",
+          "art": "stream",
+          "tint": "#D49C7C",
+          "support": "https://radioparadise.com/support"
+        },
+        {
+          "id": "rp-global",
+          "name": "Global Mix",
+          "fullName": "Radio Paradise Global",
+          "blurb": "World, ambient and everything between",
+          "source": "Radio Paradise",
+          "stream": "https://stream.radioparadise.com/global-192",
+          "art": "stream",
+          "tint": "#7FB7A0",
+          "support": "https://radioparadise.com/support"
+        },
+        {
+          "id": "soma-lush",
+          "name": "Lush",
+          "blurb": "Soft vocals and mellow electronics",
+          "source": "SomaFM",
+          "playlist": "https://somafm.com/lush.pls",
+          "stream": "https://ice1.somafm.com/lush-128-mp3",
+          "art": "lookup",
+          "tint": "#D788A6",
+          "support": "https://somafm.com/support/"
+        }
+      ]
+    },
+    {
+      "id": "classical",
+      "name": "Classical",
+      "stations": [
+        {
+          "id": "srg-classic",
+          "name": "Swiss Classic",
+          "fullName": "Radio Swiss Classic",
+          "blurb": "Calm classical music, barely any talk",
+          "source": "SRG SSR",
+          "stream": "https://stream.srg-ssr.ch/srgssr/rsc_de/mp3/128",
+          "art": "lookup",
+          "tint": "#9FA9C9",
+          "support": "https://www.radioswissclassic.ch"
+        },
+        {
+          "id": "nts-sheetmusic",
+          "name": "Sheet Music",
+          "blurb": "Classical and contemporary composition",
+          "source": "NTS",
+          "stream": "https://stream-mixtape-geo.ntslive.net/mixtape35",
+          "art": "nts:sheet-music",
+          "tint": "#B9A77F",
+          "support": "https://www.nts.live/supporters"
+        }
+      ]
+    }
+  ]
+}
