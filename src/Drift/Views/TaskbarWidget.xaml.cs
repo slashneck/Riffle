@@ -85,7 +85,8 @@ public partial class TaskbarWidget : Window
         int right = slot.Right - (int)(4 * scale);
         int available = right - slot.Left - (int)(12 * scale);
 
-        bool wanted = player.ShowInTaskbar && player.HasPlayed && slot.Visible;
+        tracker.Enabled = player.ShowInTaskbar && player.HasPlayed;
+        bool wanted = tracker.Enabled && slot.Visible;
         bool compact = available < MinTextWidth * scale;
         if (!wanted || available < CompactWidth * scale)
         {

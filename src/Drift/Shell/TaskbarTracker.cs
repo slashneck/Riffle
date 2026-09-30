@@ -38,7 +38,11 @@ public sealed class TaskbarTracker : IDisposable
         timer = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(350) };
         timer.Tick += (_, _) => Update();
 
-        foregroundProc = (_, _, _, _, _, _, _) => Update();
+        foregroundProc = (_, _, _, _, _, _, _) =>
+        {
+            if (Enabled)
+                Update();
+        };
         foregroundHook = SetWinEventHook(EVENT_SYSTEM_FOREGROUND, EVENT_SYSTEM_FOREGROUND, IntPtr.Zero,
             foregroundProc, 0, 0, WINEVENT_OUTOFCONTEXT);
     }
@@ -50,12 +54,35 @@ public sealed class TaskbarTracker : IDisposable
     public void Attach(IntPtr widgetWindow)
     {
         widget = widgetWindow;
-        timer.Start();
         Update();
+    }
+
+    // Nothing is polled while the widget isn't wanted, e.g. before the first song
+    // or with the taskbar tile switched off.
+    public bool Enabled
+    {
+        get => timer.IsEnabled;
+        set
+        {
+            if (value == timer.IsEnabled)
+                return;
+            if (value)
+            {
+                timer.Start();
+                Update();
+            }
+            else
+            {
+                timer.Stop();
+            }
+        }
     }
 
     public void Update()
     {
+        if (widget == IntPtr.Zero)
+            return;
+
         if (++ticks % 12 == 0)
             lightTheme = ReadLightTheme();
 
@@ -90,7 +117,7 @@ public sealed class TaskbarTracker : IDisposable
             trayLeft = trayRect.Left;
 
         if (bar.Width != probedBarWidth || Math.Abs(trayLeft - probedTrayLeft) > 1 ||
-            Environment.TickCount64 - lastProbe > 3000)
+            Environment.TickCount64 - lastProbe > 5000)
             ProbeButtons(taskbar, trayLeft, bar.Width);
 
         int visibleTop = Math.Max(bar.Top, info.Monitor.Top);
