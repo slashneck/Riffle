@@ -81,9 +81,15 @@ public sealed class LevelBars : FrameworkElement
             {
                 int from = i * levels.Length / count;
                 int to = Math.Max(from + 1, (i + 1) * levels.Length / count);
+                // half peak, half average: the peak alone pins wide groups at the top,
+                // the average alone barely moves
+                float peak = 0, sum = 0;
                 for (int k = from; k < to; k++)
-                    target = Math.Max(target, levels[k]);
-                target = Math.Min(1f, target * gain);
+                {
+                    peak = Math.Max(peak, levels[k]);
+                    sum += levels[k];
+                }
+                target = Math.Min(1f, (peak + sum / (to - from)) * 0.5f * gain);
             }
 
             float current = shown[i];

@@ -82,7 +82,7 @@ public partial class TaskbarWidget : Window
             ApplyTaskbarTheme(slot.LightTheme);
 
         double scale = slot.Dpi / 96.0;
-        int right = slot.Right - (int)(4 * scale);
+        int right = slot.Right - (int)(10 * scale);
         int available = right - slot.Left - (int)(12 * scale);
 
         tracker.Enabled = player.ShowInTaskbar && player.HasPlayed;

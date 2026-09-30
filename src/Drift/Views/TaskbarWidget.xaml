@@ -45,7 +45,7 @@
             </StackPanel>
 
             <controls:LevelBars x:Name="Bars" Grid.Column="2" Width="13" Height="14" Bars="3" BarWidth="3"
-                                Centered="False" VerticalAlignment="Center" Gain="1.1"
+                                Centered="False" VerticalAlignment="Center" Gain="1.05"
                                 Fill="{DynamicResource AccentBrush}" />
         </Grid>
 
