@@ -2,25 +2,23 @@ using System.Text;
 
 namespace Drift.Audio;
 
-public sealed record IcyMetadata(string? Artist, string? Title, string? ArtUrl, bool IsAdvert)
+static class IcyMetadata
 {
-    public bool HasTrack => !string.IsNullOrWhiteSpace(Title);
-
-    public static IcyMetadata Parse(string raw)
+    public static TrackInfo Parse(string raw)
     {
         var streamTitle = Field(raw, "StreamTitle")?.Trim();
         var url = Field(raw, "StreamUrl")?.Trim();
         bool advert = raw.Contains("adw_ad='true'", StringComparison.OrdinalIgnoreCase);
 
         if (string.IsNullOrEmpty(streamTitle))
-            return new IcyMetadata(null, null, url, advert);
+            return new TrackInfo(null, null, url, advert);
 
         // Most stations send "Artist - Title". Titles can contain " - " too, so split once.
         int dash = streamTitle.IndexOf(" - ", StringComparison.Ordinal);
         if (dash > 0)
-            return new IcyMetadata(streamTitle[..dash].Trim(), streamTitle[(dash + 3)..].Trim(), url, advert);
+            return new TrackInfo(streamTitle[..dash].Trim(), streamTitle[(dash + 3)..].Trim(), url, advert);
 
-        return new IcyMetadata(null, streamTitle, url, advert);
+        return new TrackInfo(null, streamTitle, url, advert);
     }
 
     static string? Field(string raw, string key)
@@ -57,7 +55,7 @@ sealed class IcyStream : Stream
         untilMeta = interval;
     }
 
-    public event Action<IcyMetadata>? MetadataChanged;
+    public event Action<TrackInfo>? MetadataChanged;
 
     public long LastDataTick { get; private set; } = Environment.TickCount64;
 

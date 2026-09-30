@@ -51,7 +51,7 @@ public partial class TaskbarWidget : Window
 
         Root.MouseEnter += (_, _) => Fade(HoverPlate, 1, 120);
         Root.MouseLeave += (_, _) => Fade(HoverPlate, 0, 200);
-        Root.MouseLeftButtonUp += (_, _) => main.ToggleFlyout();
+        Root.MouseLeftButtonUp += (_, _) => main.ToggleFlyout(Bounds);
         Root.MouseUp += OnMouseUp;
         Root.MouseWheel += OnWheel;
         Root.ContextMenuOpening += (_, _) => Root.ContextMenu = BuildMenu();
@@ -59,6 +59,9 @@ public partial class TaskbarWidget : Window
     }
 
     public event Action? QuitRequested;
+
+    internal Native.RECT? Bounds =>
+        IsVisible && handle != IntPtr.Zero && Native.GetWindowRect(handle, out var rect) ? rect : null;
 
     protected override void OnSourceInitialized(EventArgs e)
     {
@@ -85,7 +88,7 @@ public partial class TaskbarWidget : Window
         int right = slot.Right - (int)(10 * scale);
         int available = right - slot.Left - (int)(12 * scale);
 
-        tracker.Enabled = player.ShowInTaskbar && player.HasPlayed;
+        tracker.Enabled = player.ShowInTaskbar;
         bool wanted = tracker.Enabled && slot.Visible;
         bool compact = available < MinTextWidth * scale;
         if (!wanted || available < CompactWidth * scale)
@@ -200,11 +203,11 @@ public partial class TaskbarWidget : Window
         var toggle = new MenuItem { Header = player.IsPlaying ? "Pause" : "Play", Tag = player.IsPlaying ? "" : "" };
         toggle.Click += (_, _) => player.Toggle();
 
-        var next = new MenuItem { Header = "Next station", Tag = "" };
+        var next = new MenuItem { Header = player.PlaysSongs ? "Next song" : "Next station", Tag = "" };
         next.Click += (_, _) => player.Next();
 
         var open = new MenuItem { Header = "Open Drift", Tag = "" };
-        open.Click += (_, _) => main.ShowFlyout();
+        open.Click += (_, _) => main.ShowFlyout(Bounds);
 
         var hide = new MenuItem { Header = "Hide from taskbar", Tag = "" };
         hide.Click += (_, _) => player.ShowInTaskbar = false;

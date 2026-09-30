@@ -1,12 +1,17 @@
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Reflection;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Threading;
+using Drift.Radio;
+using Drift.Services;
 using Drift.Shell;
 using Drift.Themes;
 
@@ -14,10 +19,27 @@ namespace Drift.Views;
 
 public partial class MainWindow : Window
 {
+    static readonly (string Name, string Url)[] Supporters =
+    [
+        ("SomaFM", "https://somafm.com/support/"),
+        ("NTS", "https://www.nts.live/supporters"),
+        ("Radio Paradise", "https://radioparadise.com/support"),
+        ("Chillhop Music", "https://chillhop.com"),
+        ("Lofi Girl", "https://lofigirl.com"),
+    ];
+
+    static readonly (string Label, int Minutes)[] SleepChoices =
+    [
+        ("Off", 0), ("15 minutes", 15), ("30 minutes", 30), ("45 minutes", 45), ("1 hour", 60), ("2 hours", 120),
+    ];
+
     readonly Player player;
+    IntPtr handle;
     bool showingA = true;
-    bool placedByUser;
     bool quitting;
+    bool settingsOpen;
+    bool syncing;
+    long hiddenAt;
 
     public MainWindow(Player player)
     {
@@ -31,10 +53,16 @@ public partial class MainWindow : Window
         ShowArt(animate: false);
         UpdatePlayState();
         UpdateVolumeIcon();
-        Loaded += (_, _) => SyncStationChips();
+        UpdateTransport();
+        UpdateSleep();
+        FillSettings();
 
+        SupportList.ItemsSource = Supporters.Select(s => new { s.Name, s.Url }).ToList();
+        VersionText.Text = $"Drift {Assembly.GetExecutingAssembly().GetName().Version?.ToString(3)}";
+
+        Loaded += (_, _) => SyncLists();
         SourceInitialized += (_, _) => StyleFrame();
-        LocationChanged += (_, _) => { if (IsLoaded && IsVisible) placedByUser = true; };
+        Deactivated += (_, _) => HideFlyout();
         PreviewKeyDown += OnKey;
     }
 
@@ -42,41 +70,63 @@ public partial class MainWindow : Window
 
     void StyleFrame()
     {
-        var hwnd = new WindowInteropHelper(this).Handle;
-        Native.SetDwm(hwnd, Native.DWMWA_WINDOW_CORNER_PREFERENCE, Native.DWMWCP_ROUND);
-        Native.SetDwm(hwnd, Native.DWMWA_USE_IMMERSIVE_DARK_MODE, 1);
-        Native.SetDwm(hwnd, Native.DWMWA_BORDER_COLOR, 0x00262320);
+        handle = new WindowInteropHelper(this).Handle;
+        Native.SetDwm(handle, Native.DWMWA_WINDOW_CORNER_PREFERENCE, Native.DWMWCP_ROUND);
+        Native.SetDwm(handle, Native.DWMWA_USE_IMMERSIVE_DARK_MODE, 1);
+        Native.SetDwm(handle, Native.DWMWA_BORDER_COLOR, 0x00262320);
+        UpdateShellPresence();
     }
 
-    public void ShowFlyout()
+    // With the tile on, Drift is a flyout that belongs to the tile and has no taskbar
+    // button. With the tile off it needs a normal button, or there'd be no way back.
+    public void UpdateShellPresence()
     {
-        if (!placedByUser)
-        {
-            var area = SystemParameters.WorkArea;
-            Left = area.Right - Width - 12;
-            Top = area.Bottom - Height - 12;
-        }
+        bool flyout = player.ShowInTaskbar;
+        ShowInTaskbar = !flyout;
+        if (handle == IntPtr.Zero)
+            return;
+        if (flyout)
+            Native.AddExStyle(handle, Native.WS_EX_TOOLWINDOW, Native.WS_EX_APPWINDOW);
+        else
+            Native.AddExStyle(handle, 0, Native.WS_EX_TOOLWINDOW);
+    }
+
+    // anchor is the tile's rectangle in screen pixels, if it's showing
+    internal void ShowFlyout(Native.RECT? anchor = null)
+    {
+        var area = SystemParameters.WorkArea;
+        double scale = VisualTreeHelper.GetDpi(this).DpiScaleX;
+        double right = anchor is { } tile ? Math.Min(area.Right - 8, tile.Right / scale + 6) : area.Right - 12;
+        Left = right - Width;
+        Top = area.Bottom - Height - 12;
 
         Show();
         if (WindowState == WindowState.Minimized)
             WindowState = WindowState.Normal;
         Activate();
-        placedByUser = placedByUser && IsOnScreen();
+        if (handle != IntPtr.Zero)
+            Native.SetForegroundWindow(handle);
     }
 
-    public void ToggleFlyout()
+    internal void ToggleFlyout(Native.RECT? anchor = null)
     {
-        if (IsVisible && IsActive)
-            Hide();
-        else
-            ShowFlyout();
+        // The click on the tile that lands right after the flyout lost focus to it
+        // would otherwise open it straight back up.
+        if (IsVisible)
+            HideFlyout();
+        else if (Environment.TickCount64 - hiddenAt > 250)
+            ShowFlyout(anchor);
     }
 
-    bool IsOnScreen() =>
-        Left >= SystemParameters.VirtualScreenLeft - 20 &&
-        Top >= SystemParameters.VirtualScreenTop - 20 &&
-        Left + Width <= SystemParameters.VirtualScreenLeft + SystemParameters.VirtualScreenWidth + 20 &&
-        Top + Height <= SystemParameters.VirtualScreenTop + SystemParameters.VirtualScreenHeight + 20;
+    void HideFlyout()
+    {
+        if (!IsVisible || quitting)
+            return;
+        hiddenAt = Environment.TickCount64;
+        Hide();
+        if (settingsOpen)
+            ShowPage(settings: false, animate: false);
+    }
 
     void OnPlayerChanged(object? sender, PropertyChangedEventArgs e)
     {
@@ -91,9 +141,49 @@ public partial class MainWindow : Window
                 break;
             case nameof(Player.Station):
             case nameof(Player.Stations):
-                SyncStationChips();
+            case nameof(Player.Mood):
+                SyncLists();
+                UpdateTransport();
+                break;
+            case nameof(Player.PlaysSongs):
+            case nameof(Player.CanBlock):
+                UpdateTransport();
+                break;
+            case nameof(Player.IsSleeping):
+            case nameof(Player.SleepLabel):
+                UpdateSleep();
+                break;
+            case nameof(Player.CustomPlaylists):
+            case nameof(Player.BlockedCount):
+                FillSettings();
+                break;
+            case nameof(Player.ShowInTaskbar):
+                UpdateShellPresence();
                 break;
         }
+    }
+
+    // Selection is pushed after the lists have their new items instead of going through
+    // a binding, which loses the race when the list is swapped.
+    void SyncLists() => Dispatcher.BeginInvoke(() =>
+    {
+        syncing = true;
+        MoodTabs.SelectedItem = player.Mood;
+        StationChips.SelectedItem = player.Station;
+        syncing = false;
+    }, DispatcherPriority.Loaded);
+
+    // keyboard and screen readers change the selection without a click
+    void OnMoodPicked(object sender, SelectionChangedEventArgs e)
+    {
+        if (!syncing && MoodTabs.SelectedItem is Mood mood && mood != player.Mood)
+            player.SelectMood(mood);
+    }
+
+    void OnStationPicked(object sender, SelectionChangedEventArgs e)
+    {
+        if (!syncing && StationChips.SelectedItem is Station station && station != player.Station)
+            player.Select(station);
     }
 
     void UpdatePlayState()
@@ -116,6 +206,22 @@ public partial class MainWindow : Window
         {
             BusyDot.BeginAnimation(OpacityProperty, new DoubleAnimation(0, TimeSpan.FromMilliseconds(250)));
         }
+    }
+
+    void UpdateTransport()
+    {
+        bool songs = player.PlaysSongs;
+        PreviousButton.ToolTip = songs ? "Previous song" : "Previous station";
+        NextButton.ToolTip = songs ? "Next song" : "Next station";
+        BlockButton.Visibility = songs ? Visibility.Visible : Visibility.Hidden;
+        BlockButton.IsEnabled = player.CanBlock;
+        BlockButton.Opacity = player.CanBlock ? 1 : 0.35;
+    }
+
+    void UpdateSleep()
+    {
+        SleepButton.ToolTip = player.SleepLabel;
+        SleepButton.Foreground = player.IsSleeping ? Theme.Accent : (Brush)FindResource("SubtleTextBrush");
     }
 
     void UpdateVolumeIcon()
@@ -146,6 +252,46 @@ public partial class MainWindow : Window
         oldBackdrop.BeginAnimation(OpacityProperty, new DoubleAnimation(0, time * 1.6) { EasingFunction = ease });
     }
 
+    void ShowPage(bool settings, bool animate = true)
+    {
+        settingsOpen = settings;
+        var (show, hide) = settings ? ((FrameworkElement)SettingsPage, (FrameworkElement)NowPage) : (NowPage, SettingsPage);
+        var time = TimeSpan.FromMilliseconds(animate ? 220 : 0);
+        var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+
+        show.Visibility = Visibility.Visible;
+        show.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, time) { EasingFunction = ease });
+        if (show.RenderTransform is TranslateTransform slide)
+            slide.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(settings ? 24 : -24, 0, time) { EasingFunction = ease });
+
+        var fade = new DoubleAnimation(0, time);
+        fade.Completed += (_, _) =>
+        {
+            if (settingsOpen == settings)
+                hide.Visibility = Visibility.Collapsed;
+        };
+        hide.BeginAnimation(OpacityProperty, fade);
+    }
+
+    void FillSettings()
+    {
+        var fade = player.Crossfade switch { "short" => FadeShort, "long" => FadeLong, _ => FadeNormal };
+        fade.IsChecked = true;
+        (player.FollowCover ? ColorsCover : ColorsCalm).IsChecked = true;
+
+        PlaylistList.ItemsSource = null;
+        PlaylistList.ItemsSource = player.CustomPlaylists;
+
+        int blocked = player.BlockedCount;
+        BlockedText.Text = blocked switch
+        {
+            0 => "Songs you skip with the thumbs down show up here.",
+            1 => "1 song won't play again.",
+            _ => $"{blocked} songs won't play again.",
+        };
+        ClearBlockedButton.Visibility = blocked > 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
     void OnHeaderDown(object sender, MouseButtonEventArgs e)
     {
         if (e.ButtonState == MouseButtonState.Pressed)
@@ -155,75 +301,115 @@ public partial class MainWindow : Window
     void OnToggle(object sender, RoutedEventArgs e) => player.Toggle();
     void OnNext(object sender, RoutedEventArgs e) => player.Next();
     void OnPrevious(object sender, RoutedEventArgs e) => player.Previous();
-    void OnClose(object sender, RoutedEventArgs e) => Hide();
+    void OnBlock(object sender, RoutedEventArgs e) => player.BlockCurrent();
+    void OnClose(object sender, RoutedEventArgs e) => HideFlyout();
+    void OnOpenSettings(object sender, RoutedEventArgs e) => ShowPage(settings: true);
+    void OnCloseSettings(object sender, RoutedEventArgs e) => ShowPage(settings: false);
+    void OnClearBlocked(object sender, RoutedEventArgs e) => player.ClearBlocked();
+    void OnQuit(object sender, RoutedEventArgs e) => QuitRequested?.Invoke();
 
-    // The chip list is swapped whenever the mood changes, so selection is pushed after
-    // the new items exist rather than through a binding that can lose the race.
-    void SyncStationChips() =>
-        Dispatcher.BeginInvoke(() => StationChips.SelectedItem = player.Station,
-            System.Windows.Threading.DispatcherPriority.Loaded);
-
-    void OnStationPicked(object sender, SelectionChangedEventArgs e)
+    void OnMoodClick(object sender, MouseButtonEventArgs e)
     {
-        if (StationChips.SelectedItem is Radio.Station station && station != player.Station)
-            player.Select(station);
+        if (sender is ListBoxItem { DataContext: Mood mood })
+            player.SelectMood(mood);
     }
 
     // clicking the chip that's already selected should still start it
     void OnChipClick(object sender, MouseButtonEventArgs e)
     {
-        if (sender is ListBoxItem { DataContext: Radio.Station station })
+        if (sender is ListBoxItem { DataContext: Station station })
             player.Select(station);
     }
 
-    void OnMore(object sender, RoutedEventArgs e)
+    void OnSleep(object sender, RoutedEventArgs e)
     {
         var menu = new ContextMenu
         {
-            PlacementTarget = MoreButton,
-            Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom,
-            HorizontalOffset = -150,
+            PlacementTarget = SleepButton,
+            Placement = PlacementMode.Top,
+            HorizontalOffset = -120,
         };
         Theme.Install(menu.Resources);
 
-        var taskbar = new MenuItem { Header = "Show in taskbar", IsCheckable = true, IsChecked = player.ShowInTaskbar };
-        taskbar.Click += (_, _) => player.ShowInTaskbar = taskbar.IsChecked;
+        if (player.IsSleeping)
+            menu.Items.Add(new MenuItem { Header = player.SleepLabel, IsEnabled = false });
 
-        var covers = new MenuItem
+        foreach (var (label, minutes) in SleepChoices)
         {
-            Header = "Find album covers",
-            IsCheckable = true,
-            IsChecked = player.FindCovers,
-            ToolTip = "Looks up cover art for the song that's playing",
-        };
-        covers.Click += (_, _) => player.FindCovers = covers.IsChecked;
-
-        var station = player.Station;
-        var support = new MenuItem { Header = $"Support {station.Source}", Tag = "", IsEnabled = station.Support is not null };
-        support.Click += (_, _) => OpenLink(station.Support);
-
-        var quit = new MenuItem { Header = "Quit Drift", Tag = "" };
-        quit.Click += (_, _) => QuitRequested?.Invoke();
-
-        menu.Items.Add(taskbar);
-        menu.Items.Add(covers);
-        menu.Items.Add(new Separator());
-        menu.Items.Add(support);
-        menu.Items.Add(new Separator());
-        menu.Items.Add(quit);
+            var item = new MenuItem { Header = label, IsCheckable = true, IsChecked = minutes == 0 && !player.IsSleeping };
+            item.Click += (_, _) => player.SleepIn(minutes == 0 ? null : TimeSpan.FromMinutes(minutes));
+            menu.Items.Add(item);
+        }
         menu.IsOpen = true;
     }
 
-    static void OpenLink(string? url)
+    void OnCrossfade(object sender, RoutedEventArgs e)
     {
-        if (url is null || !url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        if (sender is RadioButton { Tag: string value } && value != player.Crossfade)
+            player.Crossfade = value;
+    }
+
+    void OnColors(object sender, RoutedEventArgs e)
+    {
+        bool cover = sender == ColorsCover;
+        if (cover != player.FollowCover)
+            player.FollowCover = cover;
+    }
+
+    async void OnAddPlaylist(object sender, RoutedEventArgs e)
+    {
+        var link = PlaylistLink.Text;
+        if (string.IsNullOrWhiteSpace(link))
             return;
-        try { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }); }
-        catch (Exception) { }
+
+        AddButton.IsEnabled = false;
+        PlaylistNote.Visibility = Visibility.Visible;
+        PlaylistNote.Text = "Checking the playlist";
+        var problem = await player.AddPlaylistAsync(link, null);
+        AddButton.IsEnabled = true;
+
+        if (problem is null)
+        {
+            PlaylistLink.Text = "";
+            PlaylistNote.Text = "Added. You'll find it under Yours.";
+        }
+        else
+        {
+            PlaylistNote.Text = problem;
+        }
+    }
+
+    void OnPlaylistKey(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter)
+            OnAddPlaylist(sender, e);
+    }
+
+    void OnRemovePlaylist(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: CustomPlaylist playlist })
+            player.RemovePlaylist(playlist);
+    }
+
+    void OnSupport(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { Tag: string url } && url.StartsWith("https://", StringComparison.Ordinal))
+        {
+            try { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }); }
+            catch (Exception) { }
+        }
     }
 
     void OnKey(object sender, KeyEventArgs e)
     {
+        // typing a playlist link shouldn't pause the music
+        if (e.OriginalSource is TextBox)
+        {
+            if (e.Key == Key.Escape)
+                ShowPage(settings: false);
+            return;
+        }
+
         switch (e.Key)
         {
             case Key.Space: player.Toggle(); break;
@@ -231,7 +417,8 @@ public partial class MainWindow : Window
             case Key.Left: player.Previous(); break;
             case Key.Up: player.Volume += 0.05; break;
             case Key.Down: player.Volume -= 0.05; break;
-            case Key.Escape: Hide(); break;
+            case Key.Escape when settingsOpen: ShowPage(settings: false); break;
+            case Key.Escape: HideFlyout(); break;
             default: return;
         }
         e.Handled = true;
@@ -245,10 +432,10 @@ public partial class MainWindow : Window
 
     protected override void OnClosing(CancelEventArgs e)
     {
-        // closing only tucks Drift into the taskbar, quitting is in the menu
+        // closing only tucks Drift away, quitting is in the tile's menu
         if (quitting)
             return;
         e.Cancel = true;
-        Hide();
+        HideFlyout();
     }
 }

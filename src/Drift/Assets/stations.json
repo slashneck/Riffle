@@ -5,36 +5,43 @@
       "name": "Lofi",
       "stations": [
         {
-          "id": "nts-lowkey",
-          "name": "Low Key",
-          "blurb": "Lo-fi hip-hop and smooth R&B",
-          "source": "NTS",
-          "stream": "https://stream-mixtape-geo.ntslive.net/mixtape2",
-          "art": "nts:100-percent-hip-hop",
-          "tint": "#7C8CD9",
-          "support": "https://www.nts.live/supporters"
+          "id": "lofigirl-study",
+          "name": "Study",
+          "fullName": "Lofi Girl Study",
+          "blurb": "Lofi hip-hop beats to relax and study to",
+          "source": "Lofi Girl on YouTube",
+          "kind": "youtube",
+          "playlists": [
+            "PLHD44KRu8Ods"
+          ],
+          "art": "lookup",
+          "tint": "#8E86D8"
         },
         {
-          "id": "soma-fluid",
-          "name": "Fluid",
-          "blurb": "Instrumental hip-hop and future soul",
-          "source": "SomaFM",
-          "playlist": "https://somafm.com/fluid.pls",
-          "stream": "https://ice1.somafm.com/fluid-128-mp3",
+          "id": "chillhop",
+          "name": "Chillhop",
+          "fullName": "Chillhop",
+          "blurb": "Jazzy lofi beats from the Chillhop label",
+          "source": "Chillhop on YouTube",
+          "kind": "youtube",
+          "playlists": [
+            "PLt7bG0K25iXi07OYe7jBTXvvdGItGM25I"
+          ],
           "art": "lookup",
-          "tint": "#5FB3C9",
-          "support": "https://somafm.com/support/"
+          "tint": "#D9A36B"
         },
         {
-          "id": "soma-groovesalad",
-          "name": "Groove Salad",
-          "blurb": "Chilled downtempo beats and grooves",
-          "source": "SomaFM",
-          "playlist": "https://somafm.com/groovesalad.pls",
-          "stream": "https://ice1.somafm.com/groovesalad-128-mp3",
+          "id": "lofigirl-sleep",
+          "name": "Sleepy",
+          "fullName": "Lofi Girl Sleep",
+          "blurb": "Slow ambient lofi for late nights",
+          "source": "Lofi Girl on YouTube",
+          "kind": "youtube",
+          "playlists": [
+            "PLIG1ythfJbPc"
+          ],
           "art": "lookup",
-          "tint": "#8CC37A",
-          "support": "https://somafm.com/support/"
+          "tint": "#6F86C9"
         }
       ]
     },
@@ -88,6 +95,74 @@
           "art": "nts:slow-focus",
           "tint": "#6FB3A4",
           "support": "https://www.nts.live/supporters"
+        },
+        {
+          "id": "soma-groovesalad",
+          "name": "Downtempo",
+          "blurb": "Chilled downtempo beats and grooves",
+          "source": "SomaFM",
+          "playlist": "https://somafm.com/groovesalad.pls",
+          "stream": "https://ice1.somafm.com/groovesalad-128-mp3",
+          "art": "lookup",
+          "tint": "#8CC37A",
+          "support": "https://somafm.com/support/",
+          "fullName": "Groove Salad"
+        }
+      ]
+    },
+    {
+      "id": "noise",
+      "name": "Noise",
+      "stations": [
+        {
+          "id": "noise-rain",
+          "name": "Rain",
+          "blurb": "Steady rain with drops landing close by",
+          "source": "Made by Drift",
+          "kind": "noise",
+          "noise": "rain",
+          "art": "none",
+          "tint": "#6E9BB8"
+        },
+        {
+          "id": "noise-waves",
+          "name": "Waves",
+          "blurb": "Slow waves rolling onto the shore",
+          "source": "Made by Drift",
+          "kind": "noise",
+          "noise": "waves",
+          "art": "none",
+          "tint": "#5FA7B0"
+        },
+        {
+          "id": "noise-brown",
+          "name": "Brown",
+          "blurb": "Deep, soft rumble",
+          "source": "Made by Drift",
+          "kind": "noise",
+          "noise": "brown",
+          "art": "none",
+          "tint": "#A5876B"
+        },
+        {
+          "id": "noise-pink",
+          "name": "Pink",
+          "blurb": "Balanced, like a steady waterfall",
+          "source": "Made by Drift",
+          "kind": "noise",
+          "noise": "pink",
+          "art": "none",
+          "tint": "#C48BA3"
+        },
+        {
+          "id": "noise-white",
+          "name": "White",
+          "blurb": "Bright hiss that masks everything",
+          "source": "Made by Drift",
+          "kind": "noise",
+          "noise": "white",
+          "art": "none",
+          "tint": "#A9B2BD"
         },
         {
           "id": "nts-fieldrecordings",
@@ -146,6 +221,16 @@
       "name": "Mellow",
       "stations": [
         {
+          "id": "nts-lowkey",
+          "name": "Low Key",
+          "blurb": "Smooth R&B and slow hip-hop",
+          "source": "NTS",
+          "stream": "https://stream-mixtape-geo.ntslive.net/mixtape2",
+          "art": "nts:100-percent-hip-hop",
+          "tint": "#7C8CD9",
+          "support": "https://www.nts.live/supporters"
+        },
+        {
           "id": "rp-mellow",
           "name": "Mellow Mix",
           "fullName": "Radio Paradise Mellow",
@@ -177,6 +262,17 @@
           "art": "lookup",
           "tint": "#D788A6",
           "support": "https://somafm.com/support/"
+        },
+        {
+          "id": "soma-fluid",
+          "name": "Fluid",
+          "blurb": "Instrumental hip-hop and future soul",
+          "source": "SomaFM",
+          "playlist": "https://somafm.com/fluid.pls",
+          "stream": "https://ice1.somafm.com/fluid-128-mp3",
+          "art": "lookup",
+          "tint": "#5FB3C9",
+          "support": "https://somafm.com/support/"
         }
       ]
     },
@@ -204,6 +300,125 @@
           "art": "nts:sheet-music",
           "tint": "#B9A77F",
           "support": "https://www.nts.live/supporters"
+        }
+      ]
+    },
+    {
+      "id": "cloud",
+      "name": "Cloud Era",
+      "stations": [
+        {
+          "id": "cloud-sad",
+          "name": "Sad",
+          "fullName": "Cloud Era Sad",
+          "blurb": "SoundCloud era 2015 to 2017, the melancholic side",
+          "source": "YouTube",
+          "kind": "youtube",
+          "songs": [
+            "Lil Peep - Star Shopping",
+            "Lil Peep - Benz Truck",
+            "Lil Peep - Awful Things",
+            "Lil Peep - The Way I See Things",
+            "Lil Peep - Crybaby",
+            "Lil Peep - Save That Shit",
+            "Lil Peep - Gym Class",
+            "Lil Peep - White Wine",
+            "Lil Peep - Beamer Boy",
+            "XXXTentacion - Jocelyn Flores",
+            "XXXTentacion - Revenge",
+            "XXXTentacion - Save Me",
+            "XXXTentacion - Everybody Dies In Their Nightmares",
+            "Juice WRLD - Lucid Dreams",
+            "Juice WRLD - All Girls Are The Same",
+            "Trippie Redd - Love Scars",
+            "Lil Skies - Red Roses",
+            "Lil Xan - Betrayed",
+            "Lil Uzi Vert - XO Tour Llif3"
+          ],
+          "art": "lookup",
+          "tint": "#9C8BD6"
+        },
+        {
+          "id": "cloud-smooth",
+          "name": "Smooth",
+          "fullName": "Cloud Era Smooth",
+          "blurb": "SoundCloud era 2015 to 2017, smooth and easy",
+          "source": "YouTube",
+          "kind": "youtube",
+          "songs": [
+            "Post Malone - White Iverson",
+            "Bryson Tiller - Don't",
+            "PnB Rock - Selfish",
+            "Joji - Will He",
+            "Rich Chigga - Glow Like Dat",
+            "Lil Skies - Lust",
+            "6LACK - PRBLMS",
+            "Tory Lanez - Say It",
+            "Khalid - Location",
+            "Daniel Caesar - Get You"
+          ],
+          "art": "lookup",
+          "tint": "#D59A86"
+        }
+      ]
+    },
+    {
+      "id": "memphis",
+      "name": "Memphis",
+      "stations": [
+        {
+          "id": "memphis-grey",
+          "name": "Grey",
+          "fullName": "Memphis Grey",
+          "blurb": "$uicideboy$, Pouya and Night Lovell at their calmest",
+          "source": "YouTube",
+          "kind": "youtube",
+          "songs": [
+            "$uicideboy$ - Paris",
+            "$uicideboy$ - For the Last Time",
+            "$uicideboy$ - ...And to Those I Love, Thanks for Sticking Around",
+            "$uicideboy$ - Carrollton",
+            "$uicideboy$ - Materialism as a Means to an End",
+            "$uicideboy$ - Matte Black",
+            "$uicideboy$ - Escape from Babylon",
+            "$uicideboy$ - Memoirs of a Gorilla",
+            "Pouya - Suicidal Thoughts in the Back of the Cadillac Pt. 2",
+            "Pouya - Void",
+            "Pouya - Daddy Issues",
+            "Pouya - Why Do We Get High?",
+            "Night Lovell - Dark Light",
+            "Night Lovell - Alone",
+            "Night Lovell - I'm Okay",
+            "Night Lovell - Please Don't Go"
+          ],
+          "art": "lookup",
+          "tint": "#8A8F99"
+        },
+        {
+          "id": "memphis-haze",
+          "name": "Haze",
+          "fullName": "Memphis Haze",
+          "blurb": "Bones, Xavier Wulf and Chris Travis, hazy and slow",
+          "source": "YouTube",
+          "kind": "youtube",
+          "songs": [
+            "Bones - HDMI",
+            "Bones - CtrlAltDelete",
+            "Bones - SundayNightHeat",
+            "Bones - TheOceanDoesntCareAboutSwimmingLessons",
+            "Bones - LowerTheDrawbridge",
+            "Bones - Calcium",
+            "Xavier Wulf - Morning Dew",
+            "Xavier Wulf - The Last Jewel",
+            "Xavier Wulf - Black Cloud",
+            "Chris Travis - Her Lullaby",
+            "Chris Travis - Shining Angel",
+            "Chris Travis - Miss Me When I'm Gone",
+            "Chris Travis - FijiFalls",
+            "Chris Travis - Nobody Knows"
+          ],
+          "art": "lookup",
+          "tint": "#7FA38E"
         }
       ]
     }

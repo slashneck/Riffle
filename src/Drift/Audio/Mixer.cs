@@ -9,7 +9,7 @@ sealed class Mixer : ISampleProvider
 
     readonly object gate = new();
     readonly float[] ring = new float[RingSize];
-    volatile Deck[] decks = [];
+    volatile Source[] decks = [];
     int ringPos;
     float volume;
 
@@ -17,15 +17,15 @@ sealed class Mixer : ISampleProvider
 
     public volatile float TargetVolume = 0.35f;
 
-    public event Action<Deck>? DeckSilent;
+    public event Action<Source>? SourceSilent;
 
-    public void Add(Deck deck)
+    public void Add(Source deck)
     {
         lock (gate)
             decks = [.. decks, deck];
     }
 
-    public void Remove(Deck deck)
+    public void Remove(Source deck)
     {
         lock (gate)
             decks = decks.Where(d => d != deck).ToArray();
@@ -41,7 +41,7 @@ sealed class Mixer : ISampleProvider
             if (deck.IsSilent && !deck.Retired)
             {
                 deck.Retired = true;
-                DeckSilent?.Invoke(deck);
+                SourceSilent?.Invoke(deck);
             }
         }
 

@@ -1,4 +1,5 @@
 using Drift.Radio;
+using Drift.Services;
 using NAudio.CoreAudioApi;
 using NAudio.CoreAudioApi.Interfaces;
 using NAudio.Wave;
@@ -11,23 +12,23 @@ public enum PlayerStatus { Idle, Connecting, Playing, Buffering, Paused, Error }
 public sealed class AudioEngine : IDisposable
 {
     const double FirstFade = 2.5;
-    const double Crossfade = 4.0;
     const double PauseFade = 0.6;
 
     readonly SynchronizationContext ui;
     readonly Mixer mixer = new();
     readonly MMDeviceEnumerator devices = new();
     readonly DeviceWatcher watcher;
-    readonly List<Deck> outgoing = [];
+    readonly List<Source> outgoing = [];
+    readonly YouTube youtube = new();
     WasapiOut? output;
-    Deck? current;
+    Source? current;
     bool playing;
 
     public AudioEngine(SynchronizationContext ui)
     {
         this.ui = ui;
         Spectrum = new Spectrum(mixer);
-        mixer.DeckSilent += deck => ui.Post(_ => Retire(deck), null);
+        mixer.SourceSilent += deck => ui.Post(_ => Retire(deck), null);
 
         watcher = new DeviceWatcher(() => ui.Post(_ => RestartOutput(), null));
         devices.RegisterEndpointNotificationCallback(watcher);
@@ -37,7 +38,13 @@ public sealed class AudioEngine : IDisposable
     public Station? Station { get; private set; }
     public bool IsPlaying => playing;
     public PlayerStatus Status { get; private set; }
-    public IcyMetadata? Metadata => current is { HasStarted: true } deck ? deck.Metadata : null;
+    public TrackInfo? Track => current is { HasStarted: true } source ? source.Track : null;
+    public bool CanSkip => current?.CanSkip == true;
+
+    // seconds to blend from one station, or one song, into the next
+    public double Crossfade { get; set; } = 4;
+
+    public Func<string, bool> IsBlocked { get; set; } = _ => false;
 
     public float Volume
     {
@@ -56,7 +63,7 @@ public sealed class AudioEngine : IDisposable
         playing = true;
         EnsureOutput();
 
-        if (current is not null && current.Station == station && current.State != DeckState.Failed)
+        if (current is not null && current.Station == station && current.State != SourceState.Failed)
         {
             if (current.HasStarted)
                 current.FadeTo(1f, wasPlaying ? 0.3 : 0.8);
@@ -74,32 +81,43 @@ public sealed class AudioEngine : IDisposable
                 Drop(current);
         }
 
-        var deck = new Deck(station, ui);
-        deck.Ready += OnReady;
-        deck.StateChanged += OnDeckState;
-        deck.MetadataChanged += OnDeckMetadata;
-        current = deck;
-        mixer.Add(deck);
-        deck.Start();
+        var source = Create(station);
+        source.Ready += OnReady;
+        source.StateChanged += OnSourceState;
+        source.TrackChanged += OnSourceTrack;
+        current = source;
+        mixer.Add(source);
+        source.Start();
         SetStatus(PlayerStatus.Connecting);
     }
 
-    public void Pause()
+    Source Create(Station station) => station.Kind switch
+    {
+        "youtube" => new PlaylistSource(station, ui, youtube, id => IsBlocked(id)) { Crossfade = Math.Max(3, Crossfade * 1.5) },
+        "noise" => new NoiseSource(station, ui),
+        _ => new RadioSource(station, ui),
+    };
+
+    public void Skip() => current?.Skip();
+
+    public void Back() => current?.Back();
+
+    public void Pause(double fade = PauseFade)
     {
         if (!playing)
             return;
 
         playing = false;
-        current?.FadeTo(0f, PauseFade);
+        current?.FadeTo(0f, fade);
         foreach (var deck in outgoing)
-            deck.FadeTo(0f, PauseFade);
+            deck.FadeTo(0f, fade);
         SetStatus(PlayerStatus.Paused);
 
         if (output is null)
             StopAll();
     }
 
-    void OnReady(Deck deck)
+    void OnReady(Source deck)
     {
         if (deck != current)
             return;
@@ -118,12 +136,12 @@ public sealed class AudioEngine : IDisposable
         TrackChanged?.Invoke();
     }
 
-    void OnDeckState(Deck deck)
+    void OnSourceState(Source deck)
     {
         if (deck != current)
             return;
 
-        if (deck.State != DeckState.Failed)
+        if (deck.State != SourceState.Failed)
         {
             if (playing)
                 SetStatus(MapState(deck.State));
@@ -154,13 +172,13 @@ public sealed class AudioEngine : IDisposable
         StopOutputIfIdle();
     }
 
-    void OnDeckMetadata(Deck deck)
+    void OnSourceTrack(Source deck)
     {
         if (deck == current && deck.HasStarted)
             TrackChanged?.Invoke();
     }
 
-    void Retire(Deck deck)
+    void Retire(Source deck)
     {
         if (deck == current)
         {
@@ -176,11 +194,11 @@ public sealed class AudioEngine : IDisposable
         StopOutputIfIdle();
     }
 
-    void Drop(Deck deck)
+    void Drop(Source deck)
     {
         deck.Ready -= OnReady;
-        deck.StateChanged -= OnDeckState;
-        deck.MetadataChanged -= OnDeckMetadata;
+        deck.StateChanged -= OnSourceState;
+        deck.TrackChanged -= OnSourceTrack;
         mixer.Remove(deck);
         deck.Dispose();
     }
@@ -265,11 +283,11 @@ public sealed class AudioEngine : IDisposable
         StatusChanged?.Invoke();
     }
 
-    static PlayerStatus MapState(DeckState state) => state switch
+    static PlayerStatus MapState(SourceState state) => state switch
     {
-        DeckState.Playing => PlayerStatus.Playing,
-        DeckState.Buffering => PlayerStatus.Buffering,
-        DeckState.Failed => PlayerStatus.Error,
+        SourceState.Playing => PlayerStatus.Playing,
+        SourceState.Buffering => PlayerStatus.Buffering,
+        SourceState.Failed => PlayerStatus.Error,
         _ => PlayerStatus.Connecting,
     };
 

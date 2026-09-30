@@ -11,11 +11,17 @@ public sealed class Station
     public string? FullName { get; init; }
     public string Blurb { get; init; } = "";
     public string Source { get; init; } = "";
+    // "radio", "youtube" or "noise"
+    public string Kind { get; init; } = "radio";
     public string? Stream { get; init; }
     public string? Playlist { get; init; }
+    public List<string> Playlists { get; init; } = [];
+    public List<string> Songs { get; init; } = [];
+    public string? Noise { get; init; }
 
-    // "stream" = cover url arrives in the stream metadata, "lookup" = search by title,
-    // "nts:<alias>" = NTS mixtape artwork
+    // "stream" = cover url arrives with the track (radio metadata or a video thumbnail),
+    // "lookup" = search by artist and title first, "nts:<alias>" = NTS mixtape artwork,
+    // "none" = always the generated artwork
     public string Art { get; init; } = "lookup";
     public string? Logo { get; init; }
     public string Tint { get; init; } = "#8FA3C0";
@@ -23,6 +29,7 @@ public sealed class Station
 
     [JsonIgnore] public Mood Mood { get; internal set; } = null!;
     [JsonIgnore] public string Title => FullName ?? Name;
+    [JsonIgnore] public bool IsCustom { get; init; }
     [JsonIgnore] public Color TintColor => (Color)ColorConverter.ConvertFromString(Tint);
 
     public override string ToString() => Title;

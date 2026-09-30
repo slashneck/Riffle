@@ -13,6 +13,7 @@ static class Net
         "img.radioparadise.com",
         "ntslive.co.uk",
         "mzstatic.com",
+        "i.ytimg.com",
     ];
 
     static HttpClient Create()

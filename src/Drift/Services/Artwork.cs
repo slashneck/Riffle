@@ -22,7 +22,7 @@ public sealed class ArtworkService
 
     public bool FindCovers { get; set; } = true;
 
-    public async Task<Artwork> ResolveAsync(Station station, IcyMetadata? track, CancellationToken token)
+    public async Task<Artwork> ResolveAsync(Station station, TrackInfo? track, CancellationToken token)
     {
         try
         {
@@ -36,7 +36,7 @@ public sealed class ArtworkService
         return Placeholder(station);
     }
 
-    async Task<Uri?> CoverUrlAsync(Station station, IcyMetadata? track, CancellationToken token)
+    async Task<Uri?> CoverUrlAsync(Station station, TrackInfo? track, CancellationToken token)
     {
         if (track is null || track.IsAdvert)
             return null;
@@ -45,13 +45,20 @@ public sealed class ArtworkService
             return Net.SafeImageUri(track.ArtUrl);
 
         if (station.Art == "lookup" && FindCovers && track.Artist is { } artist && track.Title is { } title)
-            return Net.SafeImageUri(await LookupAsync(artist, title, token));
+        {
+            if (Net.SafeImageUri(await LookupAsync(artist, title, token)) is { } cover)
+                return cover;
+        }
 
-        return null;
+        // YouTube tracks carry their thumbnail, which beats a generic picture
+        return track.VideoId is not null ? Net.SafeImageUri(track.ArtUrl) : null;
     }
 
     async Task<Uri?> StationArtUrlAsync(Station station, CancellationToken token)
     {
+        if (station.Art == "none")
+            return null;
+
         if (station.Art.StartsWith("nts:", StringComparison.Ordinal))
         {
             ntsArt ??= FetchNtsArtAsync();
@@ -145,6 +152,11 @@ public sealed class ArtworkService
         }
 
         using var response = await Net.Client.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead, token);
+        if (!response.IsSuccessStatusCode && uri.AbsolutePath.EndsWith("/maxresdefault.jpg", StringComparison.Ordinal))
+        {
+            // not every video has a full size thumbnail
+            return await LoadAsync(new Uri(uri.AbsoluteUri.Replace("/maxresdefault.jpg", "/mqdefault.jpg")), token);
+        }
         if (!response.IsSuccessStatusCode || response.Content.Headers.ContentLength > MaxImageBytes)
             return null;
 
@@ -170,14 +182,36 @@ public sealed class ArtworkService
     {
         try
         {
-            var image = Bitmap(bytes, 480);
-            var thumb = Bitmap(bytes, 96);
-            return new Artwork(image, thumb, bytes, Palette.FromImage(thumb));
+            var image = Square(Bitmap(bytes, 640));
+            var thumb = Square(Bitmap(bytes, 128));
+            return new Artwork(image, thumb, Encode(image), Palette.FromImage(thumb));
         }
         catch (Exception)
         {
             return null;
         }
+    }
+
+    // video thumbnails are 16:9, covers everywhere in Drift are square
+    static BitmapSource Square(BitmapSource image)
+    {
+        int w = image.PixelWidth, h = image.PixelHeight;
+        if (Math.Abs(w - h) <= 2)
+            return image;
+
+        int side = Math.Min(w, h);
+        var cropped = new CroppedBitmap(image, new Int32Rect((w - side) / 2, (h - side) / 2, side, side));
+        cropped.Freeze();
+        return cropped;
+    }
+
+    static byte[] Encode(BitmapSource image)
+    {
+        var encoder = new JpegBitmapEncoder { QualityLevel = 90 };
+        encoder.Frames.Add(BitmapFrame.Create(image));
+        using var stream = new MemoryStream();
+        encoder.Save(stream);
+        return stream.ToArray();
     }
 
     static BitmapImage Bitmap(byte[] bytes, int width)

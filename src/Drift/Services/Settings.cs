@@ -9,8 +9,20 @@ public sealed class Settings
     public Dictionary<string, string> StationByMood { get; set; } = [];
     public bool ShowInTaskbar { get; set; } = true;
     public bool FindCovers { get; set; } = true;
-    public double? WindowLeft { get; set; }
-    public double? WindowTop { get; set; }
+    public bool ResumeOnStart { get; set; }
+    public bool WasPlaying { get; set; }
+    public string Crossfade { get; set; } = "normal";
+    public bool FollowCover { get; set; } = true;
+    public List<CustomPlaylist> Playlists { get; set; } = [];
+    public List<string> Blocked { get; set; } = [];
+
+    [System.Text.Json.Serialization.JsonIgnore]
+    public double CrossfadeSeconds => Crossfade switch
+    {
+        "short" => 2,
+        "long" => 8,
+        _ => 4,
+    };
 
     static readonly JsonSerializerOptions Options = new() { WriteIndented = true };
 
@@ -47,3 +59,5 @@ public sealed class Settings
         }
     }
 }
+
+public sealed record CustomPlaylist(string Name, string Id);

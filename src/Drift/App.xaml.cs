@@ -18,7 +18,7 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
-        instance = SingleInstance.TryClaim(() => Dispatcher.BeginInvoke(() => main?.ShowFlyout()));
+        instance = SingleInstance.TryClaim(() => Dispatcher.BeginInvoke(() => main?.ShowFlyout(widget?.Bounds)));
         if (instance is null)
         {
             Shutdown();
@@ -33,12 +33,17 @@ public partial class App : Application
 
         main = new MainWindow(player);
         main.QuitRequested += Quit;
-        main.ShowFlyout();
-        player.AttachMediaControls(new WindowInteropHelper(main).Handle);
+        player.AttachMediaControls(new WindowInteropHelper(main).EnsureHandle());
 
         widget = new TaskbarWidget(player, main);
         widget.QuitRequested += Quit;
         widget.Start();
+
+        // started with Windows: just the tile, no window popping up
+        bool background = e.Args.Contains(Autostart.Flag);
+        if (!background || !player.ShowInTaskbar)
+            main.ShowFlyout(widget.Bounds);
+        player.StartUp(resume: true);
 
         SessionEnding += (_, _) => player.Save();
     }

@@ -5,149 +5,65 @@ using NAudio.Wave.SampleProviders;
 
 namespace Drift.Audio;
 
-public enum DeckState { Connecting, Buffering, Playing, Failed }
-
-// One live connection to a station. Network and decoding run on their own thread and
-// fill a buffer; the mixer pulls from it on the audio thread and applies the fade.
-sealed class Deck : IDisposable
+// One live connection to a radio station. Network and decoding run on their own thread
+// and fill a buffer that the mixer pulls from.
+sealed class RadioSource : Source
 {
-    const int SampleRate = 44100;
     const double StartBuffer = 2.0;
     const double Rebuffer = 3.0;
     const int StallTimeoutMs = 12000;
     const int MaxConnectAttempts = 3;
 
     sealed record Pipe(BufferedWaveProvider Buffer, ISampleProvider Samples);
-    sealed record FadeRequest(float Target, double Seconds);
 
-    readonly SynchronizationContext ui;
-    readonly CancellationTokenSource cancel = new();
     readonly Thread worker;
     readonly Timer watchdog;
-
     volatile Pipe? pipe;
-    volatile FadeRequest? pendingFade;
     volatile HttpResponseMessage? response;
     volatile IcyStream? icy;
     int failures;
 
     // audio thread only
-    float[] scratch = new float[8192];
-    float amount;
-    float target;
-    float step = 1f;
-    float duck = 1f;
     bool flowing;
-    bool started;
-    bool fadingOut;
+    bool flowedOnce;
 
-    public Deck(Station station, SynchronizationContext ui)
+    public RadioSource(Station station, SynchronizationContext ui) : base(station, ui)
     {
-        Station = station;
-        this.ui = ui;
-        worker = new Thread(Run) { IsBackground = true, Name = "Drift stream" };
+        worker = new Thread(Run) { IsBackground = true, Name = "Drift radio" };
         watchdog = new Timer(CheckStall, null, 2000, 2000);
     }
 
-    public Station Station { get; }
-    public DeckState State { get; private set; } = DeckState.Connecting;
-    public IcyMetadata? Metadata { get; private set; }
-    public bool HasStarted { get; private set; }
-    public bool Retired { get; set; }
+    public override void Start() => worker.Start();
 
-    // true once a fade out has fully landed on silence
-    public bool IsSilent => fadingOut && amount == 0f && pendingFade is null;
-
-    public event Action<Deck>? Ready;
-    public event Action<Deck>? StateChanged;
-    public event Action<Deck>? MetadataChanged;
-
-    public void Start() => worker.Start();
-
-    public void FadeTo(float level, double seconds) => pendingFade = new FadeRequest(level, seconds);
-
-    public void MixInto(float[] dest, int offset, int count)
+    protected override bool Render(float[] buffer, int count)
     {
-        if (pendingFade is { } fade)
-        {
-            pendingFade = null;
-            target = fade.Target;
-            fadingOut = fade.Target == 0f;
-            step = fade.Seconds <= 0 ? 1f : (float)(1.0 / (fade.Seconds * SampleRate));
-        }
-
-        int frames = count / 2;
         var current = pipe;
-        if (current is null || !TryFlow(current))
-        {
-            Advance(frames);
-            return;
-        }
-
-        if (scratch.Length < count)
-            scratch = new float[count];
-
-        int read = current.Samples.Read(scratch, 0, count);
-        if (read < count)
-        {
-            Array.Clear(scratch, read, count - read);
-            flowing = false;
-            Post(() => SetState(DeckState.Buffering));
-        }
-
-        const float duckStep = 1f / (0.35f * SampleRate);
-        for (int i = 0; i < frames; i++)
-        {
-            Tick();
-            if (duck < 1f)
-                duck = MathF.Min(1f, duck + duckStep);
-
-            float gain = MathF.Sin(amount * MathF.PI * 0.5f) * duck;
-            dest[offset + i * 2] += scratch[i * 2] * gain;
-            dest[offset + i * 2 + 1] += scratch[i * 2 + 1] * gain;
-        }
-    }
-
-    bool TryFlow(Pipe current)
-    {
-        if (flowing)
-            return true;
-
-        double need = started ? Rebuffer : StartBuffer;
-        if (current.Buffer.BufferedDuration.TotalSeconds < need)
+        if (current is null)
             return false;
 
-        flowing = true;
-        if (!started)
+        if (!flowing)
         {
-            started = true;
-            Post(() =>
+            double need = flowedOnce ? Rebuffer : StartBuffer;
+            if (current.Buffer.BufferedDuration.TotalSeconds < need)
+                return false;
+
+            flowing = true;
+            if (flowedOnce)
             {
-                HasStarted = true;
-                SetState(DeckState.Playing);
-                Ready?.Invoke(this);
-            });
+                DuckIn();
+                Post(() => SetState(SourceState.Playing));
+            }
+            flowedOnce = true;
         }
-        else
+
+        int read = current.Samples.Read(buffer, 0, count);
+        if (read < count)
         {
-            duck = 0f;
-            Post(() => SetState(DeckState.Playing));
+            Array.Clear(buffer, read, count - read);
+            flowing = false;
+            Post(() => SetState(SourceState.Buffering));
         }
         return true;
-    }
-
-    void Advance(int frames)
-    {
-        for (int i = 0; i < frames && amount != target; i++)
-            Tick();
-    }
-
-    void Tick()
-    {
-        if (amount < target)
-            amount = MathF.Min(target, amount + step);
-        else if (amount > target)
-            amount = MathF.Max(target, amount - step);
     }
 
     void Run()
@@ -171,7 +87,7 @@ sealed class Deck : IDisposable
                                int.TryParse(values.FirstOrDefault(), out var parsed) ? parsed : 0;
 
                 using var stream = new IcyStream(reply.Content.ReadAsStream(token), interval);
-                stream.MetadataChanged += meta => Post(() => OnMetadata(meta));
+                stream.MetadataChanged += meta => Post(() => SetTrack(meta));
                 icy = stream;
                 Decode(stream, token);
             }
@@ -193,13 +109,13 @@ sealed class Deck : IDisposable
 
             attempt++;
             failures++;
-            if (!started && failures >= MaxConnectAttempts)
+            if (!flowedOnce && failures >= MaxConnectAttempts)
             {
-                Post(() => SetState(DeckState.Failed));
+                Post(() => SetState(SourceState.Failed));
                 return;
             }
 
-            Post(() => SetState(DeckState.Buffering));
+            Post(() => SetState(SourceState.Buffering));
             token.WaitHandle.WaitOne(TimeSpan.FromSeconds(Math.Min(20, 1.5 * failures)));
         }
     }
@@ -278,31 +194,11 @@ sealed class Deck : IDisposable
             response?.Dispose();
     }
 
-    void OnMetadata(IcyMetadata meta)
-    {
-        Metadata = meta;
-        MetadataChanged?.Invoke(this);
-    }
-
-    void SetState(DeckState state)
-    {
-        if (State == state || cancel.IsCancellationRequested)
-            return;
-        State = state;
-        StateChanged?.Invoke(this);
-    }
-
-    void Post(Action action) => ui.Post(_ =>
-    {
-        if (!cancel.IsCancellationRequested)
-            action();
-    }, null);
-
-    public void Dispose()
+    public override void Dispose()
     {
         if (cancel.IsCancellationRequested)
             return;
-        cancel.Cancel();
+        base.Dispose();
         watchdog.Dispose();
         response?.Dispose();
     }
