@@ -1,0 +1,301 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Riffle player</title>
+<script src="https://w.soundcloud.com/player/api.js"></script>
+<body></body>
+<script>
+const post = m => chrome.webview.postMessage(m);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const Events = SC.Widget.Events;
+
+// How the player itself looks doesn't matter, nobody sees it. It's the official embed.
+function embedUrl(url, auto) {
+  return 'https://w.soundcloud.com/player/?url=' + encodeURIComponent(url) +
+    '&auto_play=' + auto + '&single_active=false&buying=false&sharing=false&download=false&show_comments=false&visual=false';
+}
+
+function createWidget(url) {
+  const frame = document.createElement('iframe');
+  frame.allow = 'autoplay; encrypted-media';
+  frame.width = 320;
+  frame.height = 160;
+  // parked outside the page: the browser skips drawing it, the sound isn't affected
+  frame.style.cssText = 'position:fixed;left:-4000px;top:-4000px;border:0';
+  frame.src = embedUrl(url, false);
+  document.body.append(frame);
+  return { frame, widget: SC.Widget(frame) };
+}
+
+const ask = (widget, getter) => new Promise(r => widget[getter](r));
+
+let master = 0.35;
+// Volume only ever turns things down from what the stream delivers. Squared so the
+// slider feels even, and 100% is exactly the original level, never above it.
+const curve = v => v * v;
+
+class Deck {
+  constructor(index) {
+    this.index = index;
+    this.level = 1;
+    this.id = null;
+    this.widget = null;
+    this.onPlay = null;
+    this.lastProgress = 0;
+  }
+
+  apply() {
+    if (this.widget)
+      this.widget.setVolume(Math.round(100 * curve(master) * this.level * 10) / 10);
+  }
+
+  load(url, id) {
+    this.id = id;
+    this.ready = false;
+    this.startAt = 0;
+    return new Promise(resolve => {
+      const timer = setTimeout(() => resolve(false), 15000);
+      const done = async () => {
+        clearTimeout(timer);
+        this.ready = true;
+        this.apply();
+        resolve(true);
+      };
+      if (!this.widget) {
+        const made = createWidget(url);
+        this.frame = made.frame;
+        this.widget = made.widget;
+        this.widget.bind(Events.READY, () => { this.apply(); if (this.pendingReady) { const p = this.pendingReady; this.pendingReady = null; p(); } });
+        this.widget.bind(Events.PLAY, () => { this.apply(); if (this.onPlay) { const p = this.onPlay; this.onPlay = null; p(); } });
+        this.widget.bind(Events.PLAY_PROGRESS, e => this.progress(e));
+        this.widget.bind(Events.FINISH, () => { if (this === decks[active] && !fading) post({ t: 'finished', id: this.id }); });
+        this.widget.bind(Events.ERROR, () => { if (this === decks[active]) post({ t: 'failed', id: this.id, why: 'error' }); });
+        this.pendingReady = done;
+      } else {
+        this.widget.load(url, { auto_play: false, single_active: false, buying: false, sharing: false, download: false, show_comments: false, visual: false, callback: done });
+      }
+    });
+  }
+
+  progress(e) {
+    if (this !== decks[active])
+      return;
+    const now = performance.now();
+    if (now - this.lastProgress < 240)
+      return;
+    this.lastProgress = now;
+    post({ t: 'progress', id: this.id, pos: e.currentPosition });
+  }
+
+  // resolves true once it's really audibly going
+  start() {
+    return new Promise(resolve => {
+      const timer = setTimeout(() => { this.onPlay = null; resolve(false); }, 9000);
+      this.onPlay = () => { clearTimeout(timer); resolve(true); };
+      this.widget.play();
+    });
+  }
+}
+
+const decks = [new Deck(0), new Deck(1)];
+let active = 0;
+let fading = false;
+let isPlaying = false;
+let fadeRun = 0;
+let standbyLoad = Promise.resolve(false);
+let requestToken = 0;
+
+const standby = () => decks[1 - active];
+
+function meta(sound) {
+  if (!sound) return null;
+  return {
+    id: sound.id, title: sound.title, artist: sound.user && sound.user.username, art: sound.artwork_url || (sound.user && sound.user.avatar_url),
+    link: sound.permalink_url, wave: sound.waveform_url, seconds: Math.round((sound.full_duration || sound.duration || 0) / 1000), policy: sound.policy,
+    preview: !!(sound.duration && sound.full_duration && sound.duration < sound.full_duration - 1000),
+  };
+}
+
+async function ramp(seconds, step) {
+  const run = ++fadeRun;
+  const began = performance.now();
+  for (;;) {
+    if (run !== fadeRun) return false;
+    const t = Math.min(1, (performance.now() - began) / (seconds * 1000));
+    step(t);
+    if (t >= 1) return true;
+    await sleep(40);
+  }
+}
+
+function finishFadeNow() {
+  fadeRun++;
+  fading = false;
+}
+
+const commands = {
+  async preload({ url, id }) {
+    const deck = standby();
+    if (deck.id === id && deck.ready) { post({ t: 'preloaded', id }); return; }
+    deck.level = 0;
+    standbyLoad = deck.load(url, id);
+    if (await standbyLoad) post({ t: 'preloaded', id });
+  },
+
+  async play({ url, id, fade, at }) {
+    const token = ++requestToken;
+    const from = decks[active];
+    const to = standby();
+    finishFadeNow();
+
+    if (to.id !== id || !to.ready) {
+      to.level = 0;
+      to.apply();
+      const pending = to.load(url, id);
+      standbyLoad = pending;
+      if (!await pending) { if (token === requestToken) post({ t: 'failed', id, why: 'load' }); return; }
+    } else {
+      await standbyLoad;
+    }
+    if (token !== requestToken) return;
+
+    const sound = meta(await ask(to.widget, 'getCurrentSound'));
+    if (sound && (sound.preview || sound.policy === 'BLOCK' || sound.policy === 'SNIP')) {
+      to.id = null;
+      post({ t: 'failed', id, why: 'preview' });
+      return;
+    }
+
+    const audible = isPlaying && from.widget && fade > 0;
+    to.level = audible ? 0 : 1;
+    to.apply();
+    if (at) to.widget.seekTo(at);
+
+    if (!await to.start()) {
+      if (token === requestToken) { to.id = null; post({ t: 'failed', id, why: 'start' }); }
+      return;
+    }
+    if (token !== requestToken) { to.widget.pause(); return; }
+
+    active = to.index;
+    isPlaying = true;
+    post({ t: 'playing', id, sound, dur: sound ? sound.seconds * 1000 : 0 });
+
+    if (audible) {
+      fading = true;
+      // Levels always add up to 1, so two songs overlapping can't push past full scale.
+      const finished = await ramp(fade, t => {
+        const s = Math.sin(t * Math.PI / 2) ** 2;
+        to.level = s; to.apply();
+        from.level = 1 - s; from.apply();
+      });
+      if (finished) { fading = false; from.widget.pause(); from.level = 1; }
+      else { from.widget.pause(); }
+    } else if (from.widget && from !== to) {
+      from.widget.pause();
+    }
+  },
+
+  async pause({ fade }) {
+    const deck = decks[active];
+    if (!deck.widget) return;
+    isPlaying = false;
+    fading = false;
+    standby().widget && standby().widget.pause();
+    const start = deck.level;
+    await ramp(fade || 0.25, t => { deck.level = start * (1 - t); deck.apply(); });
+    deck.widget.pause();
+    deck.level = 1;
+    post({ t: 'paused' });
+  },
+
+  async resume() {
+    const deck = decks[active];
+    if (!deck.widget) return;
+    deck.level = 0;
+    deck.apply();
+    isPlaying = true;
+    if (!await deck.start()) { post({ t: 'failed', id: deck.id, why: 'start' }); return; }
+    post({ t: 'resumed' });
+    await ramp(0.35, t => { deck.level = t; deck.apply(); });
+  },
+
+  seek({ ms }) { const d = decks[active]; if (d.widget) d.widget.seekTo(ms); },
+  volume({ v }) { master = v; decks.forEach(d => d.apply()); },
+  tap({ settings }) { tapSettings = settings; sendTap(); },
+
+  async collect({ id, url }) {
+    const made = createWidget(url);
+    made.frame.dataset.collect = '1';
+    const remove = () => made.frame.remove();
+    const ready = await new Promise(resolve => {
+      const timer = setTimeout(() => resolve(false), 30000);
+      made.widget.bind(Events.READY, () => { clearTimeout(timer); resolve(true); });
+    });
+    if (!ready) { remove(); post({ t: 'collect-failed', id }); return; }
+    made.widget.setVolume(0);
+
+    // The embed pages through big lists by itself. Done means the count stopped growing.
+    let last = -1, still = 0;
+    const began = performance.now();
+    let sounds = [];
+    while (performance.now() - began < 15 * 60000) {
+      if (cancelled.has(id)) { cancelled.delete(id); remove(); return; }
+      sounds = await ask(made.widget, 'getSounds') || [];
+      if (sounds.length !== last) { last = sounds.length; still = 0; post({ t: 'collect-progress', id, count: last }); }
+      else if (++still >= 14) break;
+      await sleep(1000);
+    }
+    remove();
+    if (!sounds.length) { post({ t: 'collect-failed', id }); return; }
+    const tracks = sounds.filter(s => s && s.id && s.title).map(meta);
+    // big lists go over in pieces so the message stays small
+    for (let i = 0; i < tracks.length; i += 400)
+      post({ t: 'collect-part', id, tracks: tracks.slice(i, i + 400) });
+    post({ t: 'collect-done', id, count: tracks.length });
+  },
+
+  cancelCollect({ id }) { cancelled.add(id); },
+};
+
+const cancelled = new Set();
+let tapSettings = null;
+
+function sendTap() {
+  if (!tapSettings) return;
+  document.querySelectorAll('iframe').forEach(f => {
+    if (!f.dataset.collect) f.contentWindow.postMessage({ riffle: 'settings', settings: tapSettings }, '*');
+  });
+}
+
+// the tap inside each player reports levels, the loudest of the two decks wins
+const levels = [null, null];
+let lastSpectrum = 0;
+window.addEventListener('message', e => {
+  const d = e.data;
+  if (!d || !d.riffle) return;
+  if (d.riffle === 'tap-ready') { sendTap(); post({ t: 'tap', ok: true }); }
+  if (d.riffle === 'spectrum') {
+    const slot = e.source === (decks[0].frame && decks[0].frame.contentWindow) ? 0 : 1;
+    levels[slot] = d.bands;
+    const now = performance.now();
+    if (now - lastSpectrum < 60) return;
+    lastSpectrum = now;
+    const a = levels[0], b = levels[1];
+    const lift = master > 0.01 ? -40 * Math.log10(master) / 67 : 0;
+    const merged = (a || b).map((v, i) => {
+      const peak = Math.max(v, b ? b[i] : 0, a ? a[i] : 0);
+      return peak > 0 ? Math.min(1, peak + lift) : 0;
+    });
+    post({ t: 'spectrum', bands: merged });
+    levels[slot] = null;
+  }
+});
+
+chrome.webview.addEventListener('message', e => {
+  const m = e.data;
+  const run = commands[m.cmd];
+  if (run) run(m);
+});
+
+post({ t: 'ready' });
+</script>

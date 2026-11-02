@@ -1,73 +1,57 @@
-![Drift](docs/banner.png)
+![Riffle](docs/banner.png)
 
-Drift is background sound for while you work. Pick a mood and it plays. Close the window and it keeps going from a small tile in your taskbar, right next to the clock.
+Riffle is a true shuffle for your SoundCloud. Paste your playlists, merge as many as you like, and it plays every song once, in a properly random order, from a small tile in your taskbar.
 
 ## What it does
 
-- Moods: Lofi, Ambient, Noise, Jazz, Mellow, Classical, Cloud Era and Memphis
-- Noise is rain, waves, brown, pink and white noise, made on your PC with no internet
-- Crossfades between stations and songs so nothing ever cuts in hard
-- The colors follow the cover of whatever is playing
-- A tile in the taskbar next to the tray with the cover, the song and a small level meter
-- Shows up in the Windows media flyout and works with your keyboard's media keys
-- Sleep timer that slowly fades out
-- Thumbs down a song and it won't play again
-- Add your own YouTube playlists
+- **True shuffle.** Your whole playlist, not the first few songs. Every order is equally likely and every song plays once before anything repeats.
+- **Merge playlists.** Select several and they play as one. A song that's in two of them only plays once, re-uploads included.
+- **Lives in the taskbar.** A tile next to the tray with the cover, the song and a level meter. Hover it for pause and next, scroll it for volume.
+- **Crossfades,** a five band equalizer, and an option to even out loudness.
+- **A real queue.** Search it, play something next, and see your history.
+- **Never again.** Thumbs down a song and it stays out for good.
+- **Your place is kept.** Close it and pick up mid round tomorrow.
+- **Other shuffle styles.** Spread artists apart, or hear what you've played least first. Give a playlist more weight if you want more of it.
+- Colors that follow the cover, a sleep timer, media keys and the Windows media flyout.
 
-## Where the music comes from
+## How it plays
 
-Drift doesn't host or store any music.
+Riffle doesn't download or store music. It runs SoundCloud's official embedded player in the background and tells it what to play. Artists and uploaders stay credited, and every song links back to SoundCloud.
 
-| Mood | Comes from |
-| --- | --- |
-| Ambient, Jazz, Mellow, Classical | Public streams from [SomaFM](https://somafm.com), [NTS](https://www.nts.live), [Radio Paradise](https://radioparadise.com), [Radio Swiss Jazz](https://www.radioswissjazz.ch) and [Radio Swiss Classic](https://www.radioswissclassic.ch) |
-| Lofi | Playlists from [Lofi Girl](https://lofigirl.com) and [Chillhop](https://chillhop.com) on YouTube |
-| Cloud Era, Memphis | Hand picked song lists, each song played from YouTube |
-| Noise | Made by Drift |
+Riffle is not made by or affiliated with SoundCloud.
 
-Most of these stations and labels live on listener support. If you like what you hear, there are links in Settings. Drift is not affiliated with any of them.
+## Ads
 
-About YouTube: Drift plays the audio of YouTube videos without YouTube's own player, using [YoutubeExplode](https://github.com/Tyrrrz/YoutubeExplode). YouTube's terms don't allow that, and YouTube changes things often, so those moods can stop working until Drift is updated. The radio and noise moods don't depend on it.
+"Block ads" turns away requests to known ad networks, like a browser ad blocker would. It's on by default and you can switch it off in Settings. Ads pay artists and SoundCloud, so consider SoundCloud Go if you listen a lot.
 
 ## Privacy
 
-No accounts, no telemetry, no analytics. Drift only talks to:
+No telemetry and no analytics. Riffle only talks to SoundCloud: `soundcloud.com`, `w.soundcloud.com`, `api-widget.soundcloud.com`, `dwt.soundcloud.com`, `sndcdn.com` and `media-streaming.soundcloud.cloud`. Since the player is SoundCloud's own, SoundCloud sees what you play, like on their site.
 
-- the radio station you're listening to (NTS streams through its provider, Radiomast)
-- `somafm.com` for SomaFM's playlist files
-- `img.radioparadise.com` for Radio Paradise covers
-- `www.nts.live` and `ntslive.co.uk` for NTS artwork
-- `youtube.com`, `googlevideo.com` and `ytimg.com`, only when a YouTube mood is playing
-- `itunes.apple.com` and `mzstatic.com` to find album covers by artist and title. Turn off "Find album covers" in Settings if you'd rather not.
+Signing in is optional and happens on SoundCloud's own page. Riffle never sees your password. The session stays in Riffle's browser profile on your PC, and Sign out in Settings removes it.
 
-Anyone you connect to sees your IP address, like with any website. When a YouTube mood plays, Google sees which videos you're playing, the same as watching them without being signed in. No cookies are kept between runs and songs are only held in memory, never saved.
-
-Settings, your playlists and skipped songs live in `%AppData%\Drift\settings.json`. "Start with Windows" adds one entry under the current user's Run key and removes it when you turn it off.
+Your library, settings and listening counts live in `%AppData%\Riffle`, and the browser profile in `%LocalAppData%\Riffle`. Song details only, never audio.
 
 ## Using it
 
 | Key | |
 | --- | --- |
 | Space | Play or pause |
-| Left, Right | Previous or next (song or station) |
+| Left, Right | Previous or next |
 | Up, Down | Volume |
 | Esc | Close the window |
 
-On the taskbar tile, click to open or close Drift, middle click to pause, scroll for volume and right click for more. Clicking anywhere outside Drift closes it too.
-
-## About the taskbar tile
-
-Windows 11 took away the old way for apps to put things inside the taskbar. The tile is a small window that sits over the empty part of the taskbar next to the tray. Drift keeps it lined up, out of the way of your app buttons, and hides it when a game or video goes fullscreen or the taskbar auto hides.
+On the taskbar tile, click to open or close Riffle, middle click to pause, scroll for volume and right click for more. Clicking anywhere outside Riffle closes it too.
 
 ## Building
 
-You need Windows 11 and the [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0).
+You need Windows 11 and the [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0). Playback uses the WebView2 runtime that comes with Windows 11.
 
 ```
-dotnet run --project src/Drift
+dotnet run --project src/Riffle
 ```
 
-For a standalone `Drift.exe` in `dist\Drift`:
+For a standalone `Riffle.exe` in `dist\Riffle`:
 
 ```
 powershell -ExecutionPolicy Bypass -File build/publish.ps1
@@ -75,4 +59,4 @@ powershell -ExecutionPolicy Bypass -File build/publish.ps1
 
 ## License
 
-MIT. The music belongs to the artists and the stations.
+MIT. The music belongs to the artists.

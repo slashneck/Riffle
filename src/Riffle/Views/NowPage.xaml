@@ -1,0 +1,89 @@
+<UserControl x:Class="Riffle.Views.NowPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:themes="clr-namespace:Riffle.Themes"
+             xmlns:controls="clr-namespace:Riffle.Controls">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- the artwork is the card -->
+        <Grid Height="350" ClipToBounds="True">
+            <Grid>
+                <Border x:Name="CoverA"><Border.Background><ImageBrush x:Name="CoverBrushA" Stretch="UniformToFill" /></Border.Background></Border>
+                <Border x:Name="CoverB" Opacity="0"><Border.Background><ImageBrush x:Name="CoverBrushB" Stretch="UniformToFill" /></Border.Background></Border>
+            </Grid>
+            <Rectangle IsHitTestVisible="False">
+                <Rectangle.Fill>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                        <GradientStop Color="#550B0C0F" Offset="0" />
+                        <GradientStop Color="#000B0C0F" Offset="0.2" />
+                        <GradientStop Color="#000B0C0F" Offset="0.5" />
+                        <GradientStop Color="#D90B0C0F" Offset="0.88" />
+                        <GradientStop Color="#F00B0C0F" Offset="1" />
+                    </LinearGradientBrush>
+                </Rectangle.Fill>
+            </Rectangle>
+
+            <Button x:Name="CloseButton" Style="{StaticResource IconButton}" Content="&#xE8BB;" FontSize="10" Foreground="{StaticResource TextBrush}"
+                    HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,10,10,0" ToolTip="Close"
+                    AutomationProperties.Name="Close" Click="OnClose" />
+
+            <StackPanel VerticalAlignment="Bottom" Margin="24,0,24,6">
+                <controls:Marquee Text="{Binding Title}" FontSize="21" FontWeight="SemiBold" FontFamily="{StaticResource DisplayFont}"
+                                  Foreground="{StaticResource TextBrush}" HorizontalAlignment="Left" MaxWidth="332" />
+                <controls:Marquee Text="{Binding Artist}" FontSize="13.5" Margin="0,3,0,0" FontFamily="{StaticResource UiFont}"
+                                  Foreground="{StaticResource SubtleTextBrush}" HorizontalAlignment="Left" MaxWidth="332" />
+            </StackPanel>
+        </Grid>
+
+        <Grid Grid.Row="1" Margin="24,8,24,0">
+            <controls:WaveformBar x:Name="Wave" Height="38" Progress="{Binding Progress}" Rest="{StaticResource WaveRestBrush}"
+                                  Played="{Binding Source={x:Static themes:Theme.Accent}}" />
+        </Grid>
+
+        <Grid Grid.Row="2" Margin="24,3,24,0">
+            <TextBlock Text="{Binding Elapsed}" FontSize="10.5" Foreground="{StaticResource MutedTextBrush}" />
+            <TextBlock x:Name="Status" HorizontalAlignment="Center" FontSize="10.5" Foreground="{StaticResource MutedTextBrush}" />
+            <TextBlock Text="{Binding Total}" FontSize="10.5" Foreground="{StaticResource MutedTextBrush}" HorizontalAlignment="Right" />
+        </Grid>
+
+        <Grid Grid.Row="3" Margin="0,8,0,0" HorizontalAlignment="Center">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="54" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="54" />
+            </Grid.ColumnDefinitions>
+            <Button Style="{StaticResource TransportButton}" Content="&#xE8E0;" FontSize="13" HorizontalAlignment="Left"
+                    ToolTip="Never play this again" AutomationProperties.Name="Never play this again" Click="OnNever" />
+            <Button Grid.Column="1" Style="{StaticResource TransportButton}" Content="&#xE892;" ToolTip="Previous"
+                    AutomationProperties.Name="Previous" Click="OnPrevious" />
+            <Button x:Name="PlayButton" Grid.Column="2" Style="{StaticResource PlayButton}" Margin="14,0" Content="&#xE768;" Click="OnToggle" />
+            <Button Grid.Column="3" Style="{StaticResource TransportButton}" Content="&#xE893;" ToolTip="Next"
+                    AutomationProperties.Name="Next" Click="OnNext" />
+            <Button Grid.Column="4" Style="{StaticResource TransportButton}" Content="&#xE8B1;" FontSize="13" HorizontalAlignment="Right"
+                    ToolTip="Reshuffle what's left" AutomationProperties.Name="Reshuffle" Click="OnReshuffle" />
+        </Grid>
+
+        <Grid Grid.Row="4" Margin="24,0,24,0" VerticalAlignment="Center">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock x:Name="VolumeIcon" FontFamily="{StaticResource IconFont}" FontSize="13" Foreground="{StaticResource MutedTextBrush}"
+                       VerticalAlignment="Center" Margin="0,0,12,0" />
+            <controls:DragSlider Grid.Column="1" Style="{StaticResource VolumeSlider}" AutomationProperties.Name="Volume"
+                    Value="{Binding Volume}" SmallChange="0.02" LargeChange="0.1" VerticalAlignment="Center" />
+            <Button x:Name="SleepButton" Grid.Column="2" Style="{StaticResource IconButton}" Content="&#xE708;" FontSize="13" Margin="6,0,-8,0"
+                    AutomationProperties.Name="Sleep timer" Click="OnSleep" />
+        </Grid>
+    </Grid>
+</UserControl>
