@@ -21,12 +21,37 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
+        if (e.Args.Length >= 3 && e.Args[0] == Updater.ApplyFlag)
+        {
+            Shutdown(Updater.Apply(e.Args[1], int.TryParse(e.Args[2], out int old) ? old : 0));
+            return;
+        }
+        if (e.Args.Length > 0 && e.Args[0] == Installation.UninstallFlag)
+        {
+            Shutdown(Installation.Uninstall());
+            return;
+        }
+
         instance = SingleInstance.TryClaim(() => Dispatcher.BeginInvoke(() => main?.ShowFlyout(widget?.Bounds)));
         if (instance is null)
         {
             Shutdown();
             return;
         }
+
+        // a bug in one click shouldn't take the music down with it
+        DispatcherUnhandledException += (_, args) =>
+        {
+            LogCrash(args.Exception);
+            args.Handled = true;
+        };
+        TaskScheduler.UnobservedTaskException += (_, args) =>
+        {
+            LogCrash(args.Exception);
+            args.SetObserved();
+        };
+
+        Updater.CleanUp();
 
         var ui = new DispatcherSynchronizationContext(Dispatcher);
         SynchronizationContext.SetSynchronizationContext(ui);
@@ -44,6 +69,8 @@ public partial class App : Application
         widget.QuitRequested += Quit;
         widget.Start();
 
+        main.AttachUpdates(new UpdateService(() => player.CheckForUpdates, () => player.IsPlaying, Quit));
+
         // started with Windows: just the tile, no window popping up
         if (!e.Args.Contains(Autostart.Flag) || !player.ShowTile)
             main.ShowFlyout(widget.Bounds);
@@ -58,6 +85,18 @@ public partial class App : Application
         catch (Exception)
         {
             MessageBox.Show("Riffle needs the Microsoft Edge WebView2 Runtime to play music. It comes with Windows 11; install it from Microsoft if it's missing.", "Riffle");
+        }
+    }
+
+    static void LogCrash(Exception error)
+    {
+        try
+        {
+            Directory.CreateDirectory(Settings.Folder);
+            File.AppendAllText(Path.Combine(Settings.Folder, "errors.log"), $"{DateTime.Now:u} {error}\n\n");
+        }
+        catch (Exception)
+        {
         }
     }
 

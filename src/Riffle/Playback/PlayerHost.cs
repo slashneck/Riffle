@@ -39,8 +39,7 @@ public sealed partial class PlayerHost : IDisposable
     public event Action<JsonElement>? Message;
     public event Action? AdBlocked;
 
-    public static string DataFolder =>
-        Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData), "Riffle", "WebView");
+    public static string DataFolder => Path.Combine(Services.Settings.LocalFolder, "WebView");
 
     public async Task StartAsync()
     {
@@ -139,7 +138,7 @@ public sealed partial class PlayerHost : IDisposable
     }
 
     // Reads the playlist links off a profile page. Only used when importing.
-    public async Task<List<string>> ScanLinksAsync(string pageUrl, Action<int>? progress, CancellationToken token)
+    public async Task<List<(string Url, string Title)>> ScanLinksAsync(string pageUrl, Action<int>? progress, CancellationToken token)
     {
         var scanner = new WebView2();
         var host = new Window
@@ -166,18 +165,24 @@ public sealed partial class PlayerHost : IDisposable
             const string read = """
                 (() => { window.scrollTo(0, document.body.scrollHeight);
                   const main = document.querySelector('#content') || document.body;
-                  return JSON.stringify([...new Set([...main.querySelectorAll('a[href*="/sets/"]')]
-                    .map(a => a.href).filter(h => !h.includes('?in=') && !h.includes('/discover/')))]); })()
+                  const seen = new Map();
+                  for (const a of main.querySelectorAll('a[href*="/sets/"]')) {
+                    const href = a.href;
+                    if (href.includes('?in=') || href.includes('/discover/')) continue;
+                    const text = (a.textContent || '').trim();
+                    if (!seen.has(href) || (text && !seen.get(href))) seen.set(href, text);
+                  }
+                  return JSON.stringify([...seen.entries()]); })()
                 """;
 
-            var found = new List<string>();
+            var found = new List<(string Url, string Title)>();
             int still = 0;
             while (still < 4 && !token.IsCancellationRequested)
             {
                 var raw = await scanner.CoreWebView2.ExecuteScriptAsync(read);
-                var list = JsonSerializer.Deserialize<List<string>>(JsonSerializer.Deserialize<string>(raw) ?? "[]") ?? [];
+                var list = JsonSerializer.Deserialize<List<List<string>>>(JsonSerializer.Deserialize<string>(raw) ?? "[]") ?? [];
                 still = list.Count == found.Count ? still + 1 : 0;
-                found = list;
+                found = list.Select(e => (e[0], e[1])).ToList();
                 progress?.Invoke(found.Count);
                 await Task.Delay(1200, token);
             }

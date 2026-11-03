@@ -27,10 +27,11 @@
         <ListBox x:Name="Rows" Grid.Row="2" Background="Transparent" BorderThickness="0" Margin="0,0,-6,0"
                  ItemContainerStyle="{StaticResource BareRow}"
                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                 VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling">
+                 ScrollViewer.CanContentScroll="True"
+                 VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling" VirtualizingPanel.ScrollUnit="Pixel">
             <ListBox.Template>
                 <ControlTemplate TargetType="ListBox">
-                    <ScrollViewer Style="{StaticResource ThinScroller}" Focusable="False">
+                    <ScrollViewer x:Name="Scroller" Style="{StaticResource ThinScroller}" Focusable="False" CanContentScroll="True">
                         <ItemsPresenter />
                     </ScrollViewer>
                 </ControlTemplate>

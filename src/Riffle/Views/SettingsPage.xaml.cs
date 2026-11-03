@@ -2,19 +2,17 @@ using System.ComponentModel;
 using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Media;
 using Riffle.Playback;
+using Riffle.Services;
 
 namespace Riffle.Views;
 
 public partial class SettingsPage : UserControl
 {
-    static readonly string[] BandNames = ["80", "250", "1k", "4k", "12k"];
-
     Player player = null!;
     MainWindow window = null!;
+    UpdateService? updates;
     bool filling;
-    readonly List<Controls.DragSlider> bands = [];
 
     public SettingsPage() => InitializeComponent();
 
@@ -25,41 +23,63 @@ public partial class SettingsPage : UserControl
         DataContext = target;
         VersionText.Text = $"Riffle {Assembly.GetExecutingAssembly().GetName().Version?.ToString(3)}";
 
-        for (int i = 0; i < BandNames.Length; i++)
-        {
-            int band = i;
-            var slider = new Controls.DragSlider
-            {
-                Orientation = Orientation.Vertical, Minimum = -8, Maximum = 8, Height = 72,
-                HorizontalAlignment = HorizontalAlignment.Center, IsMoveToPointEnabled = true, Focusable = false,
-                Style = (Style)FindResource("EqSlider"), Cursor = System.Windows.Input.Cursors.Hand,
-            };
-            System.Windows.Automation.AutomationProperties.SetName(slider, BandNames[i] + " Hz");
-            slider.ValueChanged += (_, e) =>
-            {
-                if (!filling)
-                    player.SetEqBand(band, e.NewValue);
-            };
-            bands.Add(slider);
-
-            var column = new StackPanel();
-            column.Children.Add(slider);
-            column.Children.Add(new TextBlock
-            {
-                Text = BandNames[i], FontSize = 10.5, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 6, 0, 0),
-                Foreground = (Brush)FindResource("MutedTextBrush"),
-            });
-            EqBands.Children.Add(column);
-        }
-
         player.PropertyChanged += OnChanged;
         IsVisibleChanged += (_, _) => { if (IsVisible) Fill(); };
         Fill();
     }
 
+    public void AttachUpdates(UpdateService service)
+    {
+        updates = service;
+        updates.Changed += ShowUpdates;
+        ShowUpdates();
+    }
+
+    void ShowUpdates()
+    {
+        if (updates is null)
+            return;
+        UpdateText.Text = updates.State switch
+        {
+            UpdateState.Checking => "Checking",
+            UpdateState.Latest => "Riffle is up to date",
+            UpdateState.Available => $"Riffle {updates.Version} is out",
+            UpdateState.Downloading => $"Downloading {updates.Version}  ·  {updates.Progress * 100:0}%",
+            UpdateState.Ready => $"Riffle {updates.Version} is ready",
+            UpdateState.Failed => updates.Error,
+            _ => "Not checked yet",
+        };
+        UpdateButton.Content = updates.State switch
+        {
+            UpdateState.Ready => "Restart to update",
+            UpdateState.Available => "Get it",
+            _ => "Check now",
+        };
+        UpdateButton.IsEnabled = updates.State is not (UpdateState.Checking or UpdateState.Downloading);
+    }
+
+    async void OnUpdateButton(object sender, RoutedEventArgs e)
+    {
+        if (updates is null)
+            return;
+        switch (updates.State)
+        {
+            case UpdateState.Ready:
+                updates.Install();
+                break;
+            case UpdateState.Available:
+                try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(updates.PageUrl) { UseShellExecute = true }); }
+                catch (Exception) { }
+                break;
+            default:
+                await updates.CheckAsync();
+                break;
+        }
+    }
+
     void OnChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName is nameof(Player.EqPreset) or nameof(Player.EqValues) or nameof(Player.NeverCount) or nameof(Player.SignedIn) or nameof(Player.AdsBlocked))
+        if (e.PropertyName is nameof(Player.NeverCount) or nameof(Player.SignedIn) or nameof(Player.AdsBlocked))
             Fill();
     }
 
@@ -69,14 +89,6 @@ public partial class SettingsPage : UserControl
 
         (player.Mode switch { "SpreadArtists" => ModeSpread, "FreshFirst" => ModeFresh, _ => ModeTrue }).IsChecked = true;
         (player.LongestMinutes switch { 15 => Long15, 30 => Long30, _ => LongOff }).IsChecked = true;
-
-        EqFlat.IsChecked = player.EqPreset == "Flat";
-        EqWarm.IsChecked = player.EqPreset == "Warm";
-        EqBass.IsChecked = player.EqPreset == "Bass";
-        EqClear.IsChecked = player.EqPreset == "Clear";
-        EqNight.IsChecked = player.EqPreset == "Night";
-        for (int i = 0; i < bands.Count; i++)
-            bands[i].Value = player.EqValues[i];
 
         int never = player.NeverCount;
         NeverText.Text = never == 0 ? "No songs blocked" : never == 1 ? "1 song blocked" : $"{never:N0} songs blocked";
@@ -104,12 +116,6 @@ public partial class SettingsPage : UserControl
     {
         if (!filling && sender is RadioButton { Tag: string minutes })
             player.LongestMinutes = int.Parse(minutes);
-    }
-
-    void OnPreset(object sender, RoutedEventArgs e)
-    {
-        if (!filling && sender is RadioButton { Content: string preset })
-            player.EqPreset = preset;
     }
 
     void OnClearNever(object sender, RoutedEventArgs e) => player.ClearNever();

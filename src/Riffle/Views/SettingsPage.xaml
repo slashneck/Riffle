@@ -36,27 +36,7 @@
                     <Button x:Name="NeverButton" Style="{StaticResource TextButton}" Content="Allow again" HorizontalAlignment="Right" Margin="0,0,-8,0" Click="OnClearNever" />
                 </Grid>
 
-                <TextBlock Text="Sound" Style="{StaticResource SectionTitle}" />
-                <Grid Margin="0,4,0,2">
-                    <TextBlock Text="Crossfade" FontSize="12.5" VerticalAlignment="Center" />
-                    <TextBlock Text="{Binding CrossfadeLabel}" FontSize="12" Foreground="{StaticResource SubtleTextBrush}" HorizontalAlignment="Right" VerticalAlignment="Center" />
-                </Grid>
-                <controls:DragSlider Style="{StaticResource VolumeSlider}" Minimum="0" Maximum="12" Value="{Binding Crossfade}" SmallChange="1" LargeChange="1" AutomationProperties.Name="Crossfade" />
-
-                <Grid Margin="0,10,0,6">
-                    <TextBlock Text="Equalizer" FontSize="12.5" VerticalAlignment="Center" />
-                    <Border Style="{StaticResource SegmentGroup}">
-                        <StackPanel Orientation="Horizontal">
-                            <RadioButton x:Name="EqFlat" Style="{StaticResource Segment}" GroupName="eq" Content="Flat" Checked="OnPreset" />
-                            <RadioButton x:Name="EqWarm" Style="{StaticResource Segment}" GroupName="eq" Content="Warm" Checked="OnPreset" />
-                            <RadioButton x:Name="EqBass" Style="{StaticResource Segment}" GroupName="eq" Content="Bass" Checked="OnPreset" />
-                            <RadioButton x:Name="EqClear" Style="{StaticResource Segment}" GroupName="eq" Content="Clear" Checked="OnPreset" />
-                            <RadioButton x:Name="EqNight" Style="{StaticResource Segment}" GroupName="eq" Content="Night" Checked="OnPreset" />
-                        </StackPanel>
-                    </Border>
-                </Grid>
-                <UniformGrid x:Name="EqBands" Rows="1" Height="96" Margin="0,2,0,4" />
-                <CheckBox Style="{StaticResource Toggle}" Content="Even out loudness" IsChecked="{Binding EvenLoudness}" />
+                <TextBlock Text="Playback" Style="{StaticResource SectionTitle}" />
                 <CheckBox x:Name="AdsToggle" Style="{StaticResource Toggle}" Content="Block ads" IsChecked="{Binding BlockAds}" />
 
                 <TextBlock Text="Windows" Style="{StaticResource SectionTitle}" />
@@ -69,6 +49,13 @@
                 <Grid Margin="0,2">
                     <TextBlock x:Name="AccountText" FontSize="12.5" VerticalAlignment="Center" />
                     <Button x:Name="SignOutButton" Style="{StaticResource TextButton}" Content="Sign out" HorizontalAlignment="Right" Margin="0,0,-8,0" Click="OnSignOut" />
+                </Grid>
+
+                <TextBlock Text="Updates" Style="{StaticResource SectionTitle}" />
+                <CheckBox Style="{StaticResource Toggle}" Content="Check for updates" IsChecked="{Binding CheckForUpdates}" />
+                <Grid Margin="0,2">
+                    <TextBlock x:Name="UpdateText" FontSize="12.5" VerticalAlignment="Center" Margin="0,0,120,0" TextTrimming="CharacterEllipsis" />
+                    <Button x:Name="UpdateButton" Style="{StaticResource TextButton}" HorizontalAlignment="Right" Margin="0,0,-8,0" Click="OnUpdateButton" />
                 </Grid>
 
                 <TextBlock Text="Your listening" Style="{StaticResource SectionTitle}" />

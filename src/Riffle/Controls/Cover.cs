@@ -11,6 +11,7 @@ namespace Riffle.Controls;
 public static class Cover
 {
     const int Keep = 400;
+    static readonly SemaphoreSlim Slots = new(6);
     static readonly Dictionary<string, BitmapImage> Cache = [];
     static readonly Queue<string> Order = new();
     static readonly Dictionary<string, Task<BitmapImage?>> Pending = [];
@@ -34,6 +35,11 @@ public static class Cover
         var url = (string?)e.NewValue;
         border.Background = (Brush)Application.Current.FindResource("ChipBrush");
         if (url is null)
+            return;
+
+        // rows flying past while scrolling shouldn't each start a download
+        await Task.Delay(90);
+        if (GetUrl(border) != url)
             return;
 
         int pixels = GetPixels(border);
@@ -66,8 +72,17 @@ public static class Cover
         {
             if (Net.SafeMediaUri(url) is not { } uri)
                 return null;
-            var bytes = await Net.Client.GetByteArrayAsync(uri);
-            var image = await Task.Run(() => ArtworkService.Bitmap(bytes, pixels));
+            await Slots.WaitAsync();
+            BitmapImage image;
+            try
+            {
+                var bytes = await Net.Client.GetByteArrayAsync(uri);
+                image = await Task.Run(() => ArtworkService.Bitmap(bytes, pixels));
+            }
+            finally
+            {
+                Slots.Release();
+            }
             Cache[key] = image;
             Order.Enqueue(key);
             while (Order.Count > Keep)

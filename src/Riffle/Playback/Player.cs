@@ -27,7 +27,19 @@ public sealed class SourceTile : INotifyPropertyChanged
     public bool Selected { get => selected; set { selected = value; Changed(); } }
     public string Status { get => status; set { status = value; Changed(); Changed(nameof(Busy)); Changed(nameof(Subtitle)); } }
     public bool Busy => status.Length > 0;
-    public string Subtitle => Busy ? status : $"{Count:N0} songs";
+    public string Subtitle
+    {
+        get
+        {
+            if (Busy)
+                return status;
+            if (Count == 0)
+                return "Empty or private";
+            return Source.Url.EndsWith("/likes", StringComparison.Ordinal)
+                ? $"{Source.Owner}  ·  {Count:N0} songs"
+                : $"{Count:N0} songs";
+        }
+    }
 
     public void Refresh()
     {
@@ -50,6 +62,7 @@ public sealed class Player : INotifyPropertyChanged, IDisposable
     readonly DispatcherTimer watchdog = new() { Interval = TimeSpan.FromSeconds(4) };
     readonly DispatcherTimer saver = new() { Interval = TimeSpan.FromSeconds(20) };
     readonly DispatcherTimer sleepTimer = new() { Interval = TimeSpan.FromSeconds(5) };
+    readonly DispatcherTimer coverTimer = new() { Interval = TimeSpan.FromMinutes(30) };
     readonly Dictionary<string, (SourceTile Tile, List<Track> Parts, TaskCompletionSource<bool> Done)> collecting = [];
     MediaControls? media;
     CancellationTokenSource? artRequest;
@@ -61,6 +74,8 @@ public sealed class Player : INotifyPropertyChanged, IDisposable
     long? preloaded;
     int failures;
     double position, duration;
+    Track? blending;
+    double blendingDuration;
     long lastProgress;
     string? notice;
     DateTime? sleepAt;
@@ -79,7 +94,10 @@ public sealed class Player : INotifyPropertyChanged, IDisposable
         host.AdBlocked += () => Changed(nameof(AdsBlocked));
 
         foreach (var source in library.Sources)
+        {
+            ChooseCover(source, source.Art);
             Tiles.Add(new SourceTile(source) { Selected = library.Selected.Contains(source.Id) });
+        }
 
         if (library.Queue is { Order.Count: > 0 } state)
         {
@@ -220,6 +238,12 @@ public sealed class Player : INotifyPropertyChanged, IDisposable
     public bool ShowTile { get => settings.ShowTile; set { settings.ShowTile = value; settings.Save(); Changed(); } }
     public bool ResumeOnStart { get => settings.ResumeOnStart; set { settings.ResumeOnStart = value; settings.Save(); Changed(); } }
 
+    public bool CheckForUpdates
+    {
+        get => settings.CheckForUpdates;
+        set { settings.CheckForUpdates = value; settings.Save(); Changed(); }
+    }
+
     public bool FollowCover
     {
         get => settings.FollowCover;
@@ -250,39 +274,93 @@ public sealed class Player : INotifyPropertyChanged, IDisposable
         set
         {
             settings.EqPreset = value;
-            settings.Eq = value switch
+            double[] gains = value switch
             {
                 "Warm" => [3, 1.5, 0, -1, -2],
-                "Bass" => [6, 3, 0, 0, 0],
-                "Clear" => [-1, -1, 0, 2.5, 3.5],
-                "Night" => [-3, 0, 1, -2, -5],
+                "Bass" => [8, 2, -1, 0, 0],
+                "Clear" => [-1, -1.5, 0, 3, 4],
+                "Night" => [-3, 0, 1, -2, -6],
                 _ => [0, 0, 0, 0, 0],
             };
+            settings.Bands = EqBand.Default();
+            for (int i = 0; i < gains.Length; i++)
+                settings.Bands[i].Gain = gains[i];
             settings.Save();
             Changed();
-            Changed(nameof(EqValues));
+            Changed(nameof(Bands));
             PushTap();
         }
     }
 
-    public double[] EqValues => settings.Eq;
+    public List<EqBand> Bands => settings.Bands;
 
-    public void SetEqBand(int band, double db)
+    public void BandsEdited()
     {
-        settings.Eq[band] = Math.Round(db * 2) / 2;
-        settings.EqPreset = "Custom";
+        if (settings.EqPreset != "Custom")
+        {
+            settings.EqPreset = "Custom";
+            Changed(nameof(EqPreset));
+        }
         settings.Save();
-        Changed(nameof(EqPreset));
         PushTap();
     }
 
-    void PushTap() => Host.Send(new { cmd = "tap", settings = new { eq = settings.Eq, level = settings.EvenLoudness } });
+    // extra dB at the end of the chain, kept clean by the limiter
+    public double Boost
+    {
+        get => settings.Boost;
+        set { settings.Boost = value; settings.Save(); Changed(); PushTap(); }
+    }
+
+    void PushTap() => Host.Send(new
+    {
+        cmd = "tap",
+        settings = new
+        {
+            bands = settings.Bands.Select(b => new { type = b.Type, freq = b.Freq, gain = b.Gain, q = b.Q }),
+            boost = settings.Boost,
+            level = settings.EvenLoudness,
+        },
+    });
+
+    // A playlist's own artwork when it has one, otherwise the cover of its first song,
+    // the same as SoundCloud shows it.
+    void ChooseCover(Source source, string? offered)
+    {
+        if (offered is not null && offered.Contains("artworks-", StringComparison.Ordinal))
+            source.Art = offered;
+        else
+            source.Art = source.Tracks.Select(id => Library.Tracks.GetValueOrDefault(id)?.Art).FirstOrDefault(a => a is not null) ?? offered;
+    }
+
+    // Picks up new names and covers changed on SoundCloud, without reloading any songs.
+    async Task RefreshCoversAsync()
+    {
+        foreach (var tile in Tiles.ToList())
+        {
+            var source = tile.Source;
+            if (collecting.ContainsKey(source.Id))
+                continue;
+
+            var (title, _, picture) = await ArtworkService.DescribeAsync(source.Url, CancellationToken.None);
+            bool isList = !source.Url.EndsWith("/likes", StringComparison.Ordinal) && !source.Url.EndsWith("/tracks", StringComparison.Ordinal);
+            if (title is not null && isList)
+                source.Title = title;
+            ChooseCover(source, picture);
+            tile.Refresh();
+            await Task.Delay(120);
+        }
+        Library.Save();
+    }
 
     public async Task StartUpAsync(bool resume)
     {
         Host.Send(new { cmd = "volume", v = settings.Volume });
         PushTap();
         SignedIn = await Host.IsSignedInAsync();
+        coverTimer.Tick += (_, _) => _ = RefreshCoversAsync();
+        coverTimer.Start();
+        _ = RefreshCoversAsync();
         if (resume && settings.ResumeOnStart && settings.WasPlaying && current is not null)
             Resume();
     }
@@ -377,6 +455,7 @@ public sealed class Player : INotifyPropertyChanged, IDisposable
 
     void PlayCurrent(double fade, int at = 0)
     {
+        blending = null;
         if (queue.Current is not { } id || !Library.Tracks.TryGetValue(id, out var track))
             return;
 
@@ -593,6 +672,9 @@ public sealed class Player : INotifyPropertyChanged, IDisposable
             case "progress":
                 OnProgress(m);
                 break;
+            case "halfway":
+                FinishBlend(m.GetProperty("id").GetInt64());
+                break;
             case "finished":
                 OnFinished(m.GetProperty("id").GetInt64());
                 break;
@@ -620,8 +702,34 @@ public sealed class Player : INotifyPropertyChanged, IDisposable
         }
     }
 
+    void FinishBlend(long id)
+    {
+        if (blending is not { } track || track.Id != id)
+            return;
+        blending = null;
+        SetCurrent(track);
+        counted = false;
+        handedOff = false;
+        if (blendingDuration > 0)
+        {
+            duration = blendingDuration;
+            blendingDuration = 0;
+        }
+        TimeChanged();
+        AfterAdvance();
+        PreloadNext();
+    }
+
     void OnPlaying(JsonElement m)
     {
+        if (blending is { } incoming && m.GetProperty("id").GetInt64() == incoming.Id)
+        {
+            blendingDuration = m.TryGetProperty("dur", out var incomingLength) ? incomingLength.GetDouble() : 0;
+            failures = 0;
+            lastProgress = Environment.TickCount64;
+            return;
+        }
+
         loading = false;
         engineHasTrack = true;
         failures = 0;
@@ -660,18 +768,26 @@ public sealed class Player : INotifyPropertyChanged, IDisposable
 
         // hand over to the next song early enough for the two to overlap
         double fade = settings.Crossfade;
-        if (playing && !handedOff && fade > 0 && duration > (fade + 2) * 1000 && position >= duration - fade * 1000 - 300 && queue.PeekNext() == preloaded && preloaded is not null)
+        if (playing && !handedOff && blending is null && fade > 0 && duration > (fade + 2) * 1000 && position >= duration - fade * 1000 && queue.PeekNext() == preloaded && preloaded is not null)
         {
             handedOff = true;
-            queue.Advance();
-            PlayCurrent(fade);
-            AfterAdvance();
+            if (queue.Advance() is { } next && Library.Tracks.TryGetValue(next, out var incoming))
+            {
+                // the old song is still what you hear: the display moves on halfway through the fade
+                blending = incoming;
+                lastProgress = Environment.TickCount64;
+                Host.Send(new { cmd = "play", id = next, url = Url(incoming), fade, at = 0 });
+                preloaded = null;
+                Library.Queue = queue.Save();
+                QueueChanged?.Invoke();
+            }
         }
     }
 
     void OnFinished(long id)
     {
-        if (current?.Id != id || !playing)
+        // the next song is already on its way in
+        if (current?.Id != id || !playing || blending is not null)
             return;
         queue.Advance();
         PlayCurrent(0);
@@ -680,6 +796,12 @@ public sealed class Player : INotifyPropertyChanged, IDisposable
 
     void OnFailed(long id, string? why)
     {
+        if (blending?.Id == id)
+        {
+            SetCurrent(blending);
+            blending = null;
+        }
+
         if (current?.Id != id)
         {
             // only the song waiting in the wings failed, nothing is interrupted
@@ -835,54 +957,65 @@ public sealed class Player : INotifyPropertyChanged, IDisposable
         SelectionChanged();
     }
 
-    // Takes whatever link gets pasted. Returns a problem to show, or null when it worked.
-    public async Task<string?> AddLinkAsync(string text, Action<string>? status = null)
+    // Works out what a pasted link points at, following short share links first.
+    public async Task<SoundCloudLink> UnderstandLinkAsync(string text)
     {
         var link = Links.Parse(text);
-        switch (link.Kind)
+        if (link.Kind == LinkKind.Invalid || !text.Contains("on.soundcloud.com", StringComparison.OrdinalIgnoreCase))
+            return link;
+
+        try
         {
-            case LinkKind.Invalid:
-                return "That isn't a SoundCloud link";
-            case LinkKind.Track:
-                return "That's a single song. Paste a playlist or profile.";
-            case LinkKind.Profile:
-                return await ImportProfileAsync(link, null, status);
-            default:
-                await AddSourceAsync(link);
-                return null;
+            var start = text.Trim().StartsWith("http", StringComparison.OrdinalIgnoreCase) ? text.Trim() : "https://" + text.Trim();
+            using var reply = await Net.Client.GetAsync(start, HttpCompletionOption.ResponseHeadersRead);
+            return Links.Parse(reply.RequestMessage?.RequestUri?.AbsoluteUri);
+        }
+        catch (Exception)
+        {
+            return default;
         }
     }
 
-    public Task<string?> ImportSignedInAsync(Action<string>? status) =>
-        ImportProfileAsync(default, "https://soundcloud.com/you/sets", status);
+    public Task AddAsync(SoundCloudLink link) => AddSourceAsync(link);
 
-    async Task<string?> ImportProfileAsync(SoundCloudLink profile, string? page, Action<string>? status)
+    // Only lists what's there. Nothing gets added or loaded until it's picked.
+    public async Task<List<(string Title, SoundCloudLink Link)>> FindPlaylistsAsync(SoundCloudLink profile, string? page, Action<int>? status)
     {
-        status?.Invoke("Looking through the profile");
-        List<string> found;
+        List<(string Url, string Title)> found;
         try
         {
-            found = await Host.ScanLinksAsync(page ?? profile.Url + "/sets", n => status?.Invoke($"Found {n} playlists"), CancellationToken.None);
+            found = await Host.ScanLinksAsync(page ?? profile.Url + "/sets", status, CancellationToken.None);
         }
         catch (Exception)
         {
             found = [];
         }
 
-        var links = found.Select(Links.Parse).Where(l => l.Kind == LinkKind.Playlist).ToList();
         var user = profile.User ?? Host.LastUser;
-        if (page is null)
-            links = links.Where(l => string.Equals(l.User, profile.User, StringComparison.OrdinalIgnoreCase)).ToList();
-
+        var list = new List<(string Title, SoundCloudLink Link)>();
         if (!string.IsNullOrEmpty(user))
-            links.Insert(0, new SoundCloudLink(LinkKind.Likes, $"https://soundcloud.com/{user}/likes", user));
+            list.Add(("Likes", new SoundCloudLink(LinkKind.Likes, $"https://soundcloud.com/{user}/likes", user)));
 
-        status?.Invoke("");
-        var jobs = links.DistinctBy(l => l.Url).Select(AddSourceAsync).ToList();
-        if (jobs.Count == 0)
-            return "No playlists found there";
-        await Task.WhenAll(jobs);
-        return null;
+        foreach (var (url, title) in found)
+        {
+            var link = Links.Parse(url);
+            if (link.Kind != LinkKind.Playlist || list.Any(e => e.Link.Url == link.Url))
+                continue;
+            if (page is null && !string.Equals(link.User, profile.User, StringComparison.OrdinalIgnoreCase))
+                continue;
+            list.Add((string.IsNullOrWhiteSpace(title) ? link.Url.Split('/').Last().Replace('-', ' ') : title, link));
+        }
+        return list;
+    }
+
+    public void MoveTile(SourceTile tile, int target)
+    {
+        int from = Tiles.IndexOf(tile);
+        if (from < 0 || from == target || target < 0 || target >= Tiles.Count)
+            return;
+        Tiles.Move(from, target);
+        Library.Sources.Remove(tile.Source);
+        Library.Sources.Insert(target, tile.Source);
     }
 
     async Task AddSourceAsync(SoundCloudLink link)
@@ -932,8 +1065,7 @@ public sealed class Player : INotifyPropertyChanged, IDisposable
                 source.Title = title;
             if (owner is not null)
                 source.Owner = owner;
-            if (picture is not null)
-                source.Art = picture;
+            source.Art = picture ?? source.Art;
             tile.Refresh();
 
             Host.Send(new { cmd = "collect", id = source.Id, url = source.Url });
@@ -963,16 +1095,14 @@ public sealed class Player : INotifyPropertyChanged, IDisposable
             foreach (var track in job.Parts)
                 Library.Tracks[track.Id] = track;
             source.Synced = DateTime.UtcNow;
-            if (source.Art is null)
-                source.Art = job.Parts.FirstOrDefault(t => t.Art is not null)?.Art;
+            ChooseCover(source, source.Art);
             job.Tile.Status = "";
             job.Tile.Refresh();
 
             // something new in a playlist that's playing joins the current round
             if (Library.Selected.Contains(id))
                 RefreshPool();
-            else if (Library.Selected.Count == 0 && Tiles.Count == 1)
-                ToggleSource(job.Tile);
+            Library.Save();
         }
         else
         {
@@ -1054,6 +1184,7 @@ public sealed class Player : INotifyPropertyChanged, IDisposable
         noticeTimer?.Cancel();
         watchdog.Stop();
         saver.Stop();
+        coverTimer.Stop();
         sleepTimer.Stop();
         Library.ResumeMs = (int)position;
         Library.Queue = queue.Count > 0 ? queue.Save() : null;

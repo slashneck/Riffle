@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- .NET Framework 4.8 ships with Windows 10 and 11, so the setup runs on a fresh PC without installing anything. -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>RiffleSetup</AssemblyName>
+    <RootNamespace>RiffleSetup</RootNamespace>
+    <ApplicationIcon>..\Riffle\Assets\riffle.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Version>1.0.0</Version>
+    <Product>Riffle Setup</Product>
+    <Description>Riffle Setup</Description>
+    <Copyright>Copyright (c) 2026 slashneck</Copyright>
+    <DebugType>none</DebugType>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="System.IO.Compression.FileSystem" />
+    <EmbeddedResource Include="..\Riffle\Assets\riffle.ico" LogicalName="riffle.ico" />
+    <!-- build-release.ps1 passes the packed app in with -p:PayloadZip=... -->
+    <EmbeddedResource Include="$(PayloadZip)" LogicalName="payload.zip" Condition="'$(PayloadZip)' != ''" />
+  </ItemGroup>
+
+</Project>

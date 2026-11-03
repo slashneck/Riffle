@@ -15,8 +15,7 @@
                 <TextBlock Text="Library" FontFamily="{StaticResource DisplayFont}" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center" />
                 <Button x:Name="AccountButton" Style="{StaticResource TextButton}" HorizontalAlignment="Right" Margin="0,0,-8,0" Click="OnAccount" />
             </Grid>
-            <TextBox x:Name="LinkBox" Style="{StaticResource Field}" Tag="Paste a SoundCloud link" Margin="0,10,0,0"
-                     TextChanged="OnLinkChanged" KeyDown="OnLinkKey" />
+            <TextBox x:Name="LinkBox" Style="{StaticResource Field}" Tag="Paste a playlist link and press Enter" Margin="0,10,0,0" KeyDown="OnLinkKey" />
             <TextBlock x:Name="LinkNote" Style="{StaticResource Note}" Margin="2,6,0,0" Visibility="Collapsed" />
             <ItemsControl x:Name="MixRow" Margin="0,8,0,0" Visibility="Collapsed">
                 <ItemsControl.ItemsPanel>
@@ -44,14 +43,14 @@
             </ItemsControl>
         </StackPanel>
 
-        <ScrollViewer Grid.Row="1" Style="{StaticResource ThinScroller}" VerticalScrollBarVisibility="Auto" Margin="24,0">
-            <ItemsControl x:Name="Tiles">
+        <ScrollViewer x:Name="TileScroller" Grid.Row="1" Style="{StaticResource ThinScroller}" VerticalScrollBarVisibility="Auto" Margin="19,0">
+            <ItemsControl x:Name="Tiles" PreviewMouseLeftButtonDown="OnTilesDown" PreviewMouseMove="OnTilesMove" PreviewMouseLeftButtonUp="OnTilesUp">
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate><UniformGrid Columns="2" VerticalAlignment="Top" /></ItemsPanelTemplate>
                 </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
-                        <Grid Height="160" Margin="0,0,0,0" Cursor="Hand" Background="Transparent" MouseLeftButtonUp="OnTile" MouseRightButtonUp="OnTileMenu">
+                        <Grid x:Name="TileRoot" Height="160" Cursor="Hand" Background="Transparent" MouseRightButtonUp="OnTileMenu">
                             <Border Margin="5" CornerRadius="12" controls:Cover.Pixels="320" controls:Cover.Url="{Binding Art}" />
                             <Border Margin="5" CornerRadius="12">
                                 <Border.Background>
@@ -75,11 +74,18 @@
                                     Visibility="{Binding Favored, Converter={StaticResource Visible}}">
                                 <TextBlock Text="{Binding Weight}" FontSize="10.5" Foreground="{Binding Source={x:Static themes:Theme.Accent}}" />
                             </Border>
+                            <Button x:Name="RemoveButton" Style="{StaticResource IconButton}" Width="24" Height="24" FontSize="9" Content="&#xE8BB;"
+                                    Foreground="{StaticResource TextBrush}" Background="#990B0C0F"
+                                    HorizontalAlignment="Left" VerticalAlignment="Top" Margin="11,11,0,0" Visibility="Collapsed"
+                                    ToolTip="Remove from library" Click="OnRemoveTile" />
                         </Grid>
                         <DataTemplate.Triggers>
                             <DataTrigger Binding="{Binding Selected}" Value="True">
                                 <Setter TargetName="Ring" Property="Visibility" Value="Visible" />
                                 <Setter TargetName="Tick" Property="Visibility" Value="Visible" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding IsMouseOver, ElementName=TileRoot}" Value="True">
+                                <Setter TargetName="RemoveButton" Property="Visibility" Value="Visible" />
                             </DataTrigger>
                         </DataTemplate.Triggers>
                     </DataTemplate>
@@ -91,7 +97,7 @@
             <TextBlock Text="&#xE8F1;" FontFamily="{StaticResource IconFont}" FontSize="26" Foreground="{Binding Source={x:Static themes:Theme.Accent}}" HorizontalAlignment="Center" />
             <TextBlock Text="Bring in your music" FontFamily="{StaticResource DisplayFont}" FontSize="16" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,12,0,0" />
             <TextBlock TextAlignment="Center" FontSize="12.5" LineHeight="19" TextWrapping="Wrap" Foreground="{StaticResource SubtleTextBrush}" Margin="0,6,0,0"
-                       Text="Paste a playlist or your profile link. A profile brings your likes and every playlist." />
+                       Text="Paste a playlist link and press Enter. It stays here until you remove it." />
         </StackPanel>
 
         <StackPanel x:Name="ActionArea" Grid.Row="2" Margin="24,8,24,12">
@@ -101,5 +107,33 @@
             </Grid>
             <Button x:Name="ShuffleButton" Style="{StaticResource PrimaryButton}" Click="OnShuffle" AutomationProperties.Name="Shuffle" />
         </StackPanel>
+
+        <!-- pick what to add from a profile -->
+        <Grid x:Name="Picker" Grid.RowSpan="3" Background="{StaticResource BaseBrush}" Visibility="Collapsed">
+            <Grid Margin="24,14,24,12">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid Margin="0,0,0,10">
+                    <TextBlock Text="Pick what to add" FontFamily="{StaticResource DisplayFont}" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center" />
+                    <Button Style="{StaticResource IconButton}" Content="&#xE8BB;" FontSize="10" HorizontalAlignment="Right" Margin="0,0,-8,0" Click="OnPickerClose"
+                            AutomationProperties.Name="Close picker" />
+                </Grid>
+                <ScrollViewer Grid.Row="1" Style="{StaticResource ThinScroller}" VerticalScrollBarVisibility="Auto">
+                    <ItemsControl x:Name="PickerList">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <CheckBox Style="{StaticResource Toggle}" IsChecked="{Binding Picked}" IsEnabled="{Binding Available}" AutomationProperties.Name="{Binding Title}">
+                                    <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" Margin="0,0,12,0" />
+                                </CheckBox>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+                <Button x:Name="PickerAdd" Grid.Row="2" Style="{StaticResource PrimaryButton}" Content="Add" Margin="0,10,0,0" Click="OnPickerAdd" AutomationProperties.Name="Add picked" />
+            </Grid>
+        </Grid>
     </Grid>
 </UserControl>

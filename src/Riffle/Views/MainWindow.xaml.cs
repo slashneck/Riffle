@@ -28,6 +28,7 @@ public partial class MainWindow : Window
         Now.Attach(player);
         QueueView.Attach(player);
         LibraryView.Attach(player, this);
+        SoundView.Attach(player);
         SettingsView.Attach(player, this);
 
         player.PropertyChanged += OnPlayerChanged;
@@ -41,6 +42,8 @@ public partial class MainWindow : Window
     }
 
     public event Action? QuitRequested;
+
+    public void AttachUpdates(Services.UpdateService updates) => SettingsView.AttachUpdates(updates);
 
     public void RequestQuit() => QuitRequested?.Invoke();
 
@@ -67,6 +70,7 @@ public partial class MainWindow : Window
         {
             "queue" => QueueView,
             "library" => LibraryView,
+            "sound" => SoundView,
             "settings" => SettingsView,
             _ => Now,
         };

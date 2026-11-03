@@ -1,47 +1,77 @@
 // Runs inside SoundCloud's embed. The player already routes its audio through Web Audio,
-// so this slots the equalizer and the level meter in front of the speakers. Nothing is
-// recorded or saved, and when the tap can't attach the song still plays untouched.
+// so this slots the equalizer, the loudness stage and the meter in front of the speakers.
+// Nothing is recorded or saved, and when the tap can't attach the song still plays untouched.
 if (location.hostname === 'w.soundcloud.com') {
   (() => {
-    const bandsHz = [80, 250, 1000, 4000, 12000];
     const realConnect = AudioNode.prototype.connect;
     const chains = new WeakMap();
-    let settings = { eq: [0, 0, 0, 0, 0], level: false };
+    let settings = { bands: [], boost: 0, level: false, volume: 0 };
     let chain = null;
+    let fadeLevel = 1;
 
     const send = m => window.parent.postMessage(Object.assign({ riffle: 1 }, m), '*');
 
     function build(ctx) {
-      const pre = ctx.createGain();
       const auto = ctx.createGain();
-      const filters = bandsHz.map((hz, i) => {
-        const f = ctx.createBiquadFilter();
-        f.type = i === 0 ? 'lowshelf' : i === bandsHz.length - 1 ? 'highshelf' : 'peaking';
-        f.frequency.value = hz;
-        f.Q.value = 0.9;
-        return f;
-      });
+      const pre = ctx.createGain();
+      const filters = [0, 1, 2, 3, 4].map(() => ctx.createBiquadFilter());
+      const boost = ctx.createGain();
+
+      // Catches peaks by turning them down for a moment instead of bending the waveform,
+      // which is what lets the music get louder without distorting. Settings come from
+      // measuring: a slower attack lets drum hits clip, a faster release distorts bass.
+      const limiter = ctx.createDynamicsCompressor();
+      limiter.threshold.value = -6;
+      limiter.knee.value = 10;
+      limiter.ratio.value = 16;
+      limiter.attack.value = 0.002;
+      limiter.release.value = 1;
+
+      // the compressor adds a fixed lift of its own, this takes it back out
+      const trim = ctx.createGain();
+      trim.gain.value = 0.72;
+
       const analyser = ctx.createAnalyser();
-      analyser.fftSize = 1024;
+      analyser.fftSize = 2048;
       analyser.smoothingTimeConstant = 0.72;
       analyser.minDecibels = -85;
       analyser.maxDecibels = -18;
 
-      let node = pre;
-      for (const n of [auto, ...filters, analyser]) { realConnect.call(node, n); node = n; }
-      realConnect.call(analyser, ctx.destination);
-      return { ctx, pre, auto, filters, analyser };
+      // the volume comes last, so the slider never changes what the limiter or meter see
+      const volume = ctx.createGain();
+      volume.gain.value = settings.volume;
+
+      // the crossfade too, and it's what two songs overlapping add up through
+      const fade = ctx.createGain();
+      fade.gain.value = fadeLevel;
+
+      let node = auto;
+      for (const n of [pre, ...filters, boost, limiter, trim, analyser, volume, fade]) { realConnect.call(node, n); node = n; }
+      realConnect.call(fade, ctx.destination);
+      return { ctx, auto, pre, filters, boost, analyser, volume, fade };
     }
+
+    const db = v => Math.pow(10, v / 20);
 
     function apply() {
       if (!chain) return;
-      settings.eq.forEach((db, i) => { chain.filters[i].gain.value = db; });
-      // Boosting a band can't overload anything because the whole signal drops by the
-      // same amount first. The extra 1 dB leaves room for compressed audio, which can
-      // overshoot full scale when decoded and would otherwise distort at high volume.
-      const boost = Math.max(0, ...settings.eq);
-      chain.pre.gain.value = Math.pow(10, -(boost + 1) / 20);
-      if (!settings.level) chain.auto.gain.setTargetAtTime(1, chain.ctx.currentTime, 0.3);
+      const now = chain.ctx.currentTime;
+      const gains = settings.bands.map(b => b.gain);
+      settings.bands.forEach((band, i) => {
+        const f = chain.filters[i];
+        if (!f) return;
+        f.type = band.type;
+        f.frequency.setTargetAtTime(band.freq, now, 0.015);
+        f.gain.setTargetAtTime(band.gain, now, 0.015);
+        f.Q.setTargetAtTime(band.q, now, 0.015);
+      });
+      // Only a little is taken back when a band is boosted, so raising the bass really
+      // sounds like more bass. The limiter looks after whatever pokes through.
+      const peak = Math.max(0, ...gains);
+      chain.pre.gain.setTargetAtTime(db(-peak * 0.3), now, 0.015);
+      chain.boost.gain.setTargetAtTime(db(settings.boost), now, 0.03);
+      chain.volume.gain.setTargetAtTime(settings.volume, now, 0.012);
+      if (!settings.level) chain.auto.gain.setTargetAtTime(1, now, 0.3);
     }
 
     function meter() {
@@ -94,11 +124,12 @@ if (location.hostname === 'w.soundcloud.com') {
             chain = built;
             apply();
             meter();
+            send({ riffle: 'attached' });
           } catch (e) {
             return realConnect.call(this, target, ...rest);
           }
         }
-        realConnect.call(this, built.pre);
+        realConnect.call(this, built.auto);
         return target;
       }
       return realConnect.call(this, target, ...rest);
@@ -108,6 +139,10 @@ if (location.hostname === 'w.soundcloud.com') {
       if (e.data && e.data.riffle === 'settings') {
         settings = e.data.settings;
         apply();
+      }
+      if (e.data && e.data.riffle === 'fade') {
+        fadeLevel = e.data.level;
+        if (chain) chain.fade.gain.setTargetAtTime(fadeLevel, chain.ctx.currentTime, 0.015);
       }
     });
 

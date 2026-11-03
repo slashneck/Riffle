@@ -14,14 +14,16 @@ public sealed class Settings
     public bool CatchReuploads { get; set; } = true;
     public int LongestMinutes { get; set; }
     public bool BlockAds { get; set; } = true;
+    public bool CheckForUpdates { get; set; } = true;
     public bool EvenLoudness { get; set; }
     public string EqPreset { get; set; } = "Flat";
-    public double[] Eq { get; set; } = [0, 0, 0, 0, 0];
+    public List<Riffle.Core.EqBand> Bands { get; set; } = Riffle.Core.EqBand.Default();
+    public double Boost { get; set; } = 6;
 
     static readonly JsonSerializerOptions Options = new() { WriteIndented = true };
 
-    public static string Folder =>
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Riffle");
+    public static string Folder => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Riffle");
+    public static string LocalFolder => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Riffle");
 
     static string FilePath => Path.Combine(Folder, "settings.json");
 

@@ -1,7 +1,9 @@
 using System.Windows;
+using System.Windows.Interop;
 using System.Windows.Threading;
 using Microsoft.Web.WebView2.Wpf;
 using Riffle.Playback;
+using Riffle.Shell;
 
 namespace Riffle.Views;
 
@@ -15,11 +17,12 @@ public sealed class SignInWindow : Window
     public SignInWindow(PlayerHost host)
     {
         Title = "Sign in to SoundCloud";
-        Width = 480;
-        Height = 700;
+        Width = 1180;
+        Height = 860;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
         Background = (System.Windows.Media.Brush)Application.Current.FindResource("BaseBrush");
         Content = view;
+        SourceInitialized += (_, _) => Native.SetDwm(new WindowInteropHelper(this).Handle, Native.DWMWA_USE_IMMERSIVE_DARK_MODE, 1);
 
         Loaded += async (_, _) =>
         {

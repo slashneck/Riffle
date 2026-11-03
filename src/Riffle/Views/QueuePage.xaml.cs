@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Threading;
 using Riffle.Core;
 using Riffle.Playback;
 using Riffle.Themes;
@@ -10,14 +11,20 @@ namespace Riffle.Views;
 
 public partial class QueuePage : UserControl
 {
+    readonly DispatcherTimer settle = new() { Interval = TimeSpan.FromMilliseconds(140) };
     Player player = null!;
 
-    public QueuePage() => InitializeComponent();
+    public QueuePage()
+    {
+        InitializeComponent();
+        settle.Tick += (_, _) => { settle.Stop(); Refresh(); };
+    }
 
     public void Attach(Player target)
     {
         player = target;
-        player.QueueChanged += () => { if (IsVisible) Refresh(); };
+        // quick changes in a row only rebuild the list once
+        player.QueueChanged += () => { if (IsVisible) { settle.Stop(); settle.Start(); } };
     }
 
     public void Refresh()
@@ -46,7 +53,10 @@ public partial class QueuePage : UserControl
     void OnSearch(object sender, TextChangedEventArgs e)
     {
         if (player is not null)
-            Refresh();
+        {
+            settle.Stop();
+            settle.Start();
+        }
     }
 
     void OnRowClick(object sender, MouseButtonEventArgs e)

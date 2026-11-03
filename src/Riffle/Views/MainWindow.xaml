@@ -41,17 +41,20 @@
             <views:NowPage x:Name="Now" />
             <views:QueuePage x:Name="QueueView" Visibility="Collapsed" />
             <views:LibraryPage x:Name="LibraryView" Visibility="Collapsed" />
+            <views:SoundPage x:Name="SoundView" Visibility="Collapsed" />
             <views:SettingsPage x:Name="SettingsView" Visibility="Collapsed" />
         </Grid>
 
         <Border Grid.Row="1" BorderThickness="0,1,0,0" BorderBrush="{StaticResource HairlineBrush}">
-            <UniformGrid Rows="1" Margin="24,0">
+            <UniformGrid Rows="1" Margin="16,0">
                 <RadioButton x:Name="NavNow" Style="{StaticResource NavButton}" Content="&#xEC4F;" GroupName="nav" ToolTip="Now playing"
                              AutomationProperties.Name="Now playing" Checked="OnNav" Tag="now" />
                 <RadioButton x:Name="NavQueue" Style="{StaticResource NavButton}" Content="&#xE8FD;" GroupName="nav" ToolTip="Queue"
                              AutomationProperties.Name="Queue" Checked="OnNav" Tag="queue" />
                 <RadioButton x:Name="NavLibrary" Style="{StaticResource NavButton}" Content="&#xE8F1;" GroupName="nav" ToolTip="Library"
                              AutomationProperties.Name="Library" Checked="OnNav" Tag="library" />
+                <RadioButton x:Name="NavSound" Style="{StaticResource NavButton}" Content="&#xE9E9;" GroupName="nav" ToolTip="Sound"
+                             AutomationProperties.Name="Sound" Checked="OnNav" Tag="sound" />
                 <RadioButton x:Name="NavSettings" Style="{StaticResource NavButton}" Content="&#xE713;" GroupName="nav" ToolTip="Settings"
                              AutomationProperties.Name="Settings" Checked="OnNav" Tag="settings" />
             </UniformGrid>

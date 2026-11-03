@@ -29,9 +29,8 @@ function createWidget(url) {
 const ask = (widget, getter) => new Promise(r => widget[getter](r));
 
 let master = 0.35;
-// Volume only ever turns things down from what the stream delivers. Squared so the
-// slider feels even, and 100% is exactly the original level, never above it.
-const curve = v => v * v;
+// Loudness follows the slider: 50% sounds about half as loud as 100%, 25% about a quarter.
+const curve = v => v <= 0 ? 0 : Math.pow(v, 1.66);
 
 class Deck {
   constructor(index) {
@@ -44,8 +43,13 @@ class Deck {
   }
 
   apply() {
-    if (this.widget)
-      this.widget.setVolume(Math.round(100 * curve(master) * this.level * 10) / 10);
+    // Once the tap is attached it does the volume and the crossfade, both after the limiter.
+    // In front of the limiter a fade would just get squeezed back up to full.
+    // Without the tap the player's own volume does both.
+    if (!this.widget) return;
+    this.widget.setVolume(this.tapped ? 100 : 100 * this.level * curve(master));
+    if (this.frame && this.frame.contentWindow)
+      this.frame.contentWindow.postMessage({ riffle: 'fade', level: this.tapped ? this.level : 1 }, '*');
   }
 
   load(url, id) {
@@ -77,8 +81,6 @@ class Deck {
   }
 
   progress(e) {
-    if (this !== decks[active])
-      return;
     const now = performance.now();
     if (now - this.lastProgress < 240)
       return;
@@ -182,12 +184,17 @@ const commands = {
 
     if (audible) {
       fading = true;
-      // Levels always add up to 1, so two songs overlapping can't push past full scale.
+      // Between a straight fade, which dips in the middle, and equal power, which can
+      // overload when both songs peak together.
+      let halfway = false;
       const finished = await ramp(fade, t => {
-        const s = Math.sin(t * Math.PI / 2) ** 2;
-        to.level = s; to.apply();
-        from.level = 1 - s; from.apply();
+        to.level = Math.sin(t * Math.PI / 2) ** 1.7;
+        to.apply();
+        from.level = Math.cos(t * Math.PI / 2) ** 1.7;
+        from.apply();
+        if (!halfway && t >= 0.5) { halfway = true; post({ t: 'halfway', id }); }
       });
+      if (!halfway) post({ t: 'halfway', id });
       if (finished) { fading = false; from.widget.pause(); from.level = 1; }
       else { from.widget.pause(); }
     } else if (from.widget && from !== to) {
@@ -220,7 +227,7 @@ const commands = {
   },
 
   seek({ ms }) { const d = decks[active]; if (d.widget) d.widget.seekTo(ms); },
-  volume({ v }) { master = v; decks.forEach(d => d.apply()); },
+  volume({ v }) { master = v; decks.forEach(d => d.apply()); sendTap(); },
   tap({ settings }) { tapSettings = settings; sendTap(); },
 
   async collect({ id, url }) {
@@ -263,7 +270,7 @@ let tapSettings = null;
 function sendTap() {
   if (!tapSettings) return;
   document.querySelectorAll('iframe').forEach(f => {
-    if (!f.dataset.collect) f.contentWindow.postMessage({ riffle: 'settings', settings: tapSettings }, '*');
+    if (!f.dataset.collect) f.contentWindow.postMessage({ riffle: 'settings', settings: Object.assign({}, tapSettings, { volume: curve(master) }) }, '*');
   });
 }
 
@@ -274,6 +281,11 @@ window.addEventListener('message', e => {
   const d = e.data;
   if (!d || !d.riffle) return;
   if (d.riffle === 'tap-ready') { sendTap(); post({ t: 'tap', ok: true }); }
+  if (d.riffle === 'attached') {
+    const deck = decks.find(x => x.frame && x.frame.contentWindow === e.source);
+    if (deck) { deck.tapped = true; deck.apply(); }
+    sendTap();
+  }
   if (d.riffle === 'spectrum') {
     const slot = e.source === (decks[0].frame && decks[0].frame.contentWindow) ? 0 : 1;
     levels[slot] = d.bands;
@@ -281,11 +293,7 @@ window.addEventListener('message', e => {
     if (now - lastSpectrum < 60) return;
     lastSpectrum = now;
     const a = levels[0], b = levels[1];
-    const lift = master > 0.01 ? -40 * Math.log10(master) / 67 : 0;
-    const merged = (a || b).map((v, i) => {
-      const peak = Math.max(v, b ? b[i] : 0, a ? a[i] : 0);
-      return peak > 0 ? Math.min(1, peak + lift) : 0;
-    });
+    const merged = (a || b).map((v, i) => Math.max(v, b ? b[i] : 0, a ? a[i] : 0));
     post({ t: 'spectrum', bands: merged });
     levels[slot] = null;
   }
