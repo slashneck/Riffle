@@ -64,15 +64,15 @@
                                     <TextBlock Text="{Binding Subtitle}" FontSize="11" Foreground="{StaticResource SubtleTextBrush}" Margin="0,1,0,0" TextTrimming="CharacterEllipsis" />
                                 </StackPanel>
                             </Border>
-                            <Border x:Name="Ring" Margin="5" CornerRadius="12" BorderThickness="2" BorderBrush="{Binding Source={x:Static themes:Theme.Accent}}" Visibility="Collapsed" />
-                            <Border x:Name="Tick" Width="22" Height="22" CornerRadius="11" Background="{Binding Source={x:Static themes:Theme.Accent}}"
+                            <Border x:Name="Ring" Margin="5" CornerRadius="12" BorderThickness="2" BorderBrush="{Binding Path=(themes:Theme.Accent)}" Visibility="Collapsed" />
+                            <Border x:Name="Tick" Width="22" Height="22" CornerRadius="11" Background="{Binding Path=(themes:Theme.Accent)}"
                                     HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,12,12,0" Visibility="Collapsed">
                                 <TextBlock Text="&#xE73E;" FontFamily="{StaticResource IconFont}" FontSize="11" Foreground="{StaticResource BaseBrush}"
                                            HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Border>
                             <Border CornerRadius="9" Background="#B30B0C0F" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="12,12,0,0" Padding="7,2,7,3"
                                     Visibility="{Binding Favored, Converter={StaticResource Visible}}">
-                                <TextBlock Text="{Binding Weight}" FontSize="10.5" Foreground="{Binding Source={x:Static themes:Theme.Accent}}" />
+                                <TextBlock Text="{Binding Weight}" FontSize="10.5" Foreground="{Binding Path=(themes:Theme.Accent)}" />
                             </Border>
                             <Button x:Name="RemoveButton" Style="{StaticResource IconButton}" Width="24" Height="24" FontSize="9" Content="&#xE8BB;"
                                     Foreground="{StaticResource TextBrush}" Background="#990B0C0F"
@@ -94,7 +94,7 @@
         </ScrollViewer>
 
         <StackPanel x:Name="Welcome" Grid.Row="1" VerticalAlignment="Center" Margin="44,0,44,40" Visibility="Collapsed">
-            <TextBlock Text="&#xE8F1;" FontFamily="{StaticResource IconFont}" FontSize="26" Foreground="{Binding Source={x:Static themes:Theme.Accent}}" HorizontalAlignment="Center" />
+            <TextBlock Text="&#xE8F1;" FontFamily="{StaticResource IconFont}" FontSize="26" Foreground="{Binding Path=(themes:Theme.Accent)}" HorizontalAlignment="Center" />
             <TextBlock Text="Bring in your music" FontFamily="{StaticResource DisplayFont}" FontSize="16" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,12,0,0" />
             <TextBlock TextAlignment="Center" FontSize="12.5" LineHeight="19" TextWrapping="Wrap" Foreground="{StaticResource SubtleTextBrush}" Margin="0,6,0,0"
                        Text="Paste a playlist link and press Enter. It stays here until you remove it." />

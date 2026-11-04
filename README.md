@@ -34,7 +34,7 @@ Riffle is a true shuffle for your SoundCloud. Paste your playlists, merge as man
   <img src="docs/screens/tile.png" alt="The tile in the taskbar">
 </p>
 
-<p align="center"><sub>Covers and song names in these pictures are made up.</sub></p>
+<p align="center"><sub>Pictures from version 1.0.0. Covers and song names in them are made up.</sub></p>
 
 ## What it does
 
@@ -49,6 +49,7 @@ Riffle is a true shuffle for your SoundCloud. Paste your playlists, merge as man
 - **Never again.** Thumbs down a song and it stays out for good.
 - **Your place is kept.** Close it and pick up mid round tomorrow.
 - **Other shuffle styles.** Spread artists apart, or hear what you've played least first. Give a playlist more weight if you want more of it.
+- **Ultra performance.** One switch in Settings turns off covers, animations and the level meter, so it's just the music.
 - Colors that follow the cover, a sleep timer, media keys and the Windows media flyout.
 
 ## Install

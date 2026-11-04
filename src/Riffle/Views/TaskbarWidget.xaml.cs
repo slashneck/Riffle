@@ -47,6 +47,7 @@ public partial class TaskbarWidget : Window
 
         player.PropertyChanged += OnPlayerChanged;
         player.ArtChanged += () => ShowArt(animate: true);
+        Theme.StaticPropertyChanged += (_, e) => { if (e.PropertyName == nameof(Theme.Accent)) PaintIndicator(); };
         tracker.SlotChanged += Place;
 
         Root.MouseEnter += (_, _) =>
@@ -151,7 +152,12 @@ public partial class TaskbarWidget : Window
                 UpdateText();
                 break;
             case nameof(Player.IsPlaying):
+            case nameof(Player.UltraPerformance):
                 UpdatePlayState();
+                break;
+            case nameof(Player.IsLoadingSlowly):
+                UpdateText();
+                TileToggle.IsEnabled = !player.IsLoadingSlowly;
                 break;
             case nameof(Player.ShowTile):
                 Place();
@@ -162,25 +168,45 @@ public partial class TaskbarWidget : Window
     void UpdateText()
     {
         TitleText.Text = player.Title;
-        SubText.Text = volumeNote ?? player.Artist;
+        SubText.Text = volumeNote ?? (player.IsLoadingSlowly ? "Loading song" : player.Artist);
     }
 
     void UpdatePlayState()
     {
-        Bars.Active = player.IsPlaying;
+        Bars.Active = player.IsPlaying && !Theme.Still;
         TileToggle.Content = player.IsPlaying ? "" : "";
-        Indicator.Background = player.IsPlaying ? Theme.Accent : PausedMark;
-        Indicator.BeginAnimation(WidthProperty, new DoubleAnimation(player.IsPlaying ? 16 : 6, TimeSpan.FromMilliseconds(260))
+        PaintIndicator();
+        if (Theme.Still)
         {
-            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut },
-        });
+            Indicator.BeginAnimation(WidthProperty, null);
+            Indicator.Width = player.IsPlaying ? 16 : 6;
+        }
+        else
+        {
+            Indicator.BeginAnimation(WidthProperty, new DoubleAnimation(player.IsPlaying ? 16 : 6, TimeSpan.FromMilliseconds(260))
+            {
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut },
+            });
+        }
         Indicator.Margin = new Thickness(player.IsPlaying ? 15 : 20, 0, 0, 2);
     }
 
+    void PaintIndicator() => Indicator.Background = player.IsPlaying ? Theme.Accent : PausedMark;
+
     void ShowArt(bool animate)
     {
-        var (nextBrush, nextBorder, oldBorder) = showingA ? (CoverBrushB, CoverB, CoverA) : (CoverBrushA, CoverA, CoverB);
-        nextBrush.ImageSource = player.Art.Thumb;
+        var (nextBorder, oldBorder) = showingA ? (CoverB, CoverA) : (CoverA, CoverB);
+        if (Theme.Still)
+        {
+            nextBorder.BeginAnimation(OpacityProperty, null);
+            oldBorder.BeginAnimation(OpacityProperty, null);
+            CoverA.Background = CoverB.Background = null;
+            return;
+        }
+
+        var picture = new ImageBrush(player.Art.Thumb) { Stretch = Stretch.UniformToFill };
+        picture.Freeze();
+        nextBorder.Background = picture;
         showingA = !showingA;
 
         var time = animate ? TimeSpan.FromMilliseconds(700) : TimeSpan.Zero;
@@ -260,7 +286,7 @@ public partial class TaskbarWidget : Window
     }
 
     static void Fade(UIElement element, double to, int ms) =>
-        element.BeginAnimation(OpacityProperty, new DoubleAnimation(to, TimeSpan.FromMilliseconds(ms)));
+        element.BeginAnimation(OpacityProperty, new DoubleAnimation(to, Theme.Still ? TimeSpan.Zero : TimeSpan.FromMilliseconds(ms)));
 
     static Brush Frozen(Color color)
     {

@@ -44,6 +44,8 @@
                 <CheckBox Style="{StaticResource Toggle}" Content="Start with Windows" IsChecked="{Binding StartWithWindows}" />
                 <CheckBox Style="{StaticResource Toggle}" Content="Keep playing when Riffle starts" IsChecked="{Binding ResumeOnStart}" />
                 <CheckBox Style="{StaticResource Toggle}" Content="Colors from the cover" IsChecked="{Binding FollowCover}" />
+                <CheckBox Style="{StaticResource Toggle}" Content="Ultra performance" IsChecked="{Binding UltraPerformance}"
+                          ToolTip="No covers, no animations, no level meter. Just the music." />
 
                 <TextBlock Text="Account" Style="{StaticResource SectionTitle}" />
                 <Grid Margin="0,2">

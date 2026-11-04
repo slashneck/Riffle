@@ -101,6 +101,15 @@ public sealed class Marquee : FrameworkElement
 
     void Wake()
     {
+        if (Riffle.Themes.Theme.Still)
+        {
+            swap = 1;
+            offset = 0;
+            Unhook();
+            InvalidateVisual();
+            return;
+        }
+
         if (!hooked && !rest.IsEnabled && IsVisible && (swap < 1 || Overflows))
         {
             if (swap >= 1 && holdLeft > 0)
@@ -193,6 +202,7 @@ public sealed class Marquee : FrameworkElement
             mask.GradientStops.Add(new GradientStop(Colors.Black, edge));
             mask.GradientStops.Add(new GradientStop(Colors.Black, 1 - edge));
             mask.GradientStops.Add(new GradientStop(Colors.Transparent, 1));
+            mask.Freeze();
             dc.PushOpacityMask(mask);
         }
 

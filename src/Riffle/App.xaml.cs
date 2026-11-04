@@ -52,6 +52,7 @@ public partial class App : Application
         };
 
         Updater.CleanUp();
+        RegisterApplicationRestart($"{Autostart.Flag} {RecoveredFlag}", 0);
 
         var ui = new DispatcherSynchronizationContext(Dispatcher);
         SynchronizationContext.SetSynchronizationContext(ui);
@@ -80,13 +81,18 @@ public partial class App : Application
         try
         {
             await host.StartAsync();
-            await player.StartUpAsync(resume: true);
+            await player.StartUpAsync(resume: true, recovered: e.Args.Contains(RecoveredFlag));
         }
         catch (Exception)
         {
             MessageBox.Show("Riffle needs the Microsoft Edge WebView2 Runtime to play music. It comes with Windows 11; install it from Microsoft if it's missing.", "Riffle");
         }
     }
+
+    const string RecoveredFlag = "--recovered";
+
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+    static extern int RegisterApplicationRestart(string commandLine, int flags);
 
     static void LogCrash(Exception error)
     {

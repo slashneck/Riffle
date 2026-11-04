@@ -26,7 +26,7 @@
             <RowDefinition Height="52" />
         </Grid.RowDefinitions>
 
-        <Rectangle Grid.RowSpan="2" Fill="{Binding Source={x:Static themes:Theme.Deep}}" />
+        <Rectangle Grid.RowSpan="2" Fill="{Binding Path=(themes:Theme.Deep)}" />
         <Rectangle Grid.RowSpan="2" IsHitTestVisible="False">
             <Rectangle.Fill>
                 <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">

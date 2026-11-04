@@ -53,7 +53,7 @@ public static class Updater
         using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         var root = doc.RootElement;
 
-        if (!Version.TryParse((root.GetProperty("tag_name").GetString() ?? "").TrimStart('v', 'V'), out var parsed))
+        if (!Version.TryParse((root.GetProperty("tag_name").GetString() ?? "").TrimStart('v', 'V').Split('-')[0], out var parsed))
             return null;
         var version = new Version(parsed.Major, parsed.Minor, Math.Max(0, parsed.Build));
         if (version <= Current)

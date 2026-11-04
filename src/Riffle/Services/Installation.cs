@@ -41,6 +41,9 @@ public static class Installation
             return 1;
 
         StopOtherCopies(folder);
+        var settings = Settings.Load();
+        settings.AccountName = null;
+        settings.Save();
         try { Autostart.Enabled = false; } catch (Exception) { }
         foreach (var shortcut in new[]
         {

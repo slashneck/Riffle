@@ -15,8 +15,8 @@
         <!-- the artwork is the card -->
         <Grid Height="350" ClipToBounds="True">
             <Grid>
-                <Border x:Name="CoverA"><Border.Background><ImageBrush x:Name="CoverBrushA" Stretch="UniformToFill" /></Border.Background></Border>
-                <Border x:Name="CoverB" Opacity="0"><Border.Background><ImageBrush x:Name="CoverBrushB" Stretch="UniformToFill" /></Border.Background></Border>
+                <Border x:Name="CoverA" />
+                <Border x:Name="CoverB" Opacity="0" />
             </Grid>
             <Rectangle IsHitTestVisible="False">
                 <Rectangle.Fill>
@@ -44,7 +44,7 @@
 
         <Grid Grid.Row="1" Margin="24,8,24,0">
             <controls:WaveformBar x:Name="Wave" Height="38" Progress="{Binding Progress}" Rest="{StaticResource WaveRestBrush}"
-                                  Played="{Binding Source={x:Static themes:Theme.Accent}}" />
+                                  Played="{Binding Path=(themes:Theme.Accent)}" />
         </Grid>
 
         <Grid Grid.Row="2" Margin="24,3,24,0">
@@ -66,6 +66,10 @@
             <Button Grid.Column="1" Style="{StaticResource TransportButton}" Content="&#xE892;" ToolTip="Previous"
                     AutomationProperties.Name="Previous" Click="OnPrevious" />
             <Button x:Name="PlayButton" Grid.Column="2" Style="{StaticResource PlayButton}" Margin="14,0" Content="&#xE768;" Click="OnToggle" />
+            <Ellipse x:Name="Spinner" Grid.Column="2" Width="56" Height="56" Margin="14,0" IsHitTestVisible="False" Visibility="Collapsed"
+                     Stroke="{StaticResource SubtleTextBrush}" StrokeThickness="2" StrokeDashArray="20 66" RenderTransformOrigin="0.5,0.5">
+                <Ellipse.RenderTransform><RotateTransform x:Name="SpinnerTurn" /></Ellipse.RenderTransform>
+            </Ellipse>
             <Button Grid.Column="3" Style="{StaticResource TransportButton}" Content="&#xE893;" ToolTip="Next"
                     AutomationProperties.Name="Next" Click="OnNext" />
             <Button Grid.Column="4" Style="{StaticResource TransportButton}" Content="&#xE8B1;" FontSize="13" HorizontalAlignment="Right"

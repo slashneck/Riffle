@@ -26,12 +26,8 @@
             </Grid.ColumnDefinitions>
 
             <Grid Width="30" Height="30" VerticalAlignment="Center">
-                <Border x:Name="CoverA" CornerRadius="6">
-                    <Border.Background><ImageBrush x:Name="CoverBrushA" Stretch="UniformToFill" /></Border.Background>
-                </Border>
-                <Border x:Name="CoverB" CornerRadius="6" Opacity="0">
-                    <Border.Background><ImageBrush x:Name="CoverBrushB" Stretch="UniformToFill" /></Border.Background>
-                </Border>
+                <Border x:Name="CoverA" CornerRadius="6" />
+                <Border x:Name="CoverB" CornerRadius="6" Opacity="0" />
                 <Border CornerRadius="6" BorderThickness="1" BorderBrush="#1AFFFFFF" />
             </Grid>
 
@@ -42,7 +38,7 @@
 
             <Grid x:Name="SideSlot" Grid.Column="2" VerticalAlignment="Center">
                 <controls:LevelBars x:Name="Bars" Width="13" Height="14" Margin="0,0,2,0" Bars="3" BarWidth="3" Centered="False"
-                                    VerticalAlignment="Center" Gain="1.05" Fill="{Binding Source={x:Static themes:Theme.Accent}}" />
+                                    VerticalAlignment="Center" Gain="1.05" Fill="{Binding Path=(themes:Theme.Accent)}" />
                 <StackPanel x:Name="Controls" Orientation="Horizontal" Visibility="Collapsed">
                     <Button x:Name="TileToggle" Style="{StaticResource IconButton}" Width="26" Height="26" FontSize="11" PreviewMouseLeftButtonDown="OnButtonDown" PreviewMouseLeftButtonUp="OnToggle" />
                     <Button x:Name="TileNext" Style="{StaticResource IconButton}" Width="26" Height="26" FontSize="11" Content="&#xE893;" PreviewMouseLeftButtonDown="OnButtonDown" PreviewMouseLeftButtonUp="OnNext" />

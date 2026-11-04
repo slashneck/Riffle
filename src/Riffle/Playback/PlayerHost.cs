@@ -137,6 +137,48 @@ public sealed partial class PlayerHost : IDisposable
         view.CoreWebView2?.CookieManager.DeleteAllCookies();
     }
 
+    // Which account the session belongs to, from the page SoundCloud shows that account.
+    public async Task<string?> FindUserAsync()
+    {
+        var scanner = new WebView2();
+        var host = new Window
+        {
+            Width = 1200, Height = 900, Left = -8000, Top = -8000, WindowStyle = WindowStyle.None,
+            ShowInTaskbar = false, ShowActivated = false, WindowStartupLocation = WindowStartupLocation.Manual,
+            Content = scanner, Title = "Riffle account",
+        };
+        host.Show();
+        Native.AddExStyle(new WindowInteropHelper(host).Handle, Native.WS_EX_TOOLWINDOW | Native.WS_EX_NOACTIVATE);
+
+        try
+        {
+            await scanner.EnsureCoreWebView2Async(environment);
+            scanner.CoreWebView2.IsMuted = true;
+            Watch(scanner.CoreWebView2);
+            scanner.CoreWebView2.Navigate("https://soundcloud.com/you/sets");
+
+            const string read = """
+                (() => { const a = document.querySelector('a.header__userNavUsernameButton');
+                  if (a) return a.pathname;
+                  const first = location.pathname.split('/')[1];
+                  return first && first !== 'you' && first !== 'signin' ? first : ''; })()
+                """;
+            for (int attempt = 0; attempt < 15; attempt++)
+            {
+                await Task.Delay(1000);
+                var who = JsonSerializer.Deserialize<string>(await scanner.CoreWebView2.ExecuteScriptAsync(read))?.Trim('/');
+                if (!string.IsNullOrEmpty(who))
+                    return who;
+            }
+            return null;
+        }
+        finally
+        {
+            scanner.Dispose();
+            host.Close();
+        }
+    }
+
     // Reads the playlist links off a profile page. Only used when importing.
     public async Task<List<(string Url, string Title)>> ScanLinksAsync(string pageUrl, Action<int>? progress, CancellationToken token)
     {

@@ -57,7 +57,12 @@ public partial class LibraryPage : UserControl
         {
             case nameof(Player.ShuffleLabel):
             case nameof(Player.SelectionDetail):
+            case nameof(Player.UltraPerformance):
+                Tiles.ItemsSource = null;
+                Tiles.ItemsSource = player.Tiles;
+                break;
             case nameof(Player.SignedIn):
+            case nameof(Player.AccountName):
             case nameof(Player.Mixes):
                 UpdateAll();
                 break;
@@ -76,7 +81,7 @@ public partial class LibraryPage : UserControl
         DetailRow.Visibility = player.Library.Selected.Count > 1 || Detail.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
         SaveMixButton.Visibility = player.Library.Selected.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
 
-        AccountButton.Content = player.SignedIn ? "Add from my account" : "Sign in";
+        AccountButton.Content = !player.SignedIn ? "Sign in" : player.AccountName is { } name ? $"Add from {Short(name)}" : "Add from my account";
 
         MixRow.ItemsSource = null;
         MixRow.ItemsSource = player.Mixes;

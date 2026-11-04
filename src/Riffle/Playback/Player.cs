@@ -99,6 +99,9 @@ public sealed class Player : INotifyPropertyChanged, IDisposable
             Tiles.Add(new SourceTile(source) { Selected = library.Selected.Contains(source.Id) });
         }
 
+        Theme.Still = settings.UltraPerformance;
+        slowLoad.Tick += (_, _) => { slowLoad.Stop(); SetLoadingSlowly(true); };
+
         if (library.Queue is { Order.Count: > 0 } state)
         {
             queue.Restore(state);
@@ -139,6 +142,8 @@ public sealed class Player : INotifyPropertyChanged, IDisposable
     public string? TrackLink => current?.Link;
     public bool IsPlaying => playing;
     public bool IsLoading => loading;
+    public bool IsLoadingSlowly { get; private set; }
+    public string? AccountName => settings.AccountName;
     public bool HasSources => Tiles.Count > 0;
     public bool HasQueue => queue.Count > 0;
     public double Position => position;
@@ -238,6 +243,33 @@ public sealed class Player : INotifyPropertyChanged, IDisposable
     public bool ShowTile { get => settings.ShowTile; set { settings.ShowTile = value; settings.Save(); Changed(); } }
     public bool ResumeOnStart { get => settings.ResumeOnStart; set { settings.ResumeOnStart = value; settings.Save(); Changed(); } }
 
+    public bool UltraPerformance
+    {
+        get => settings.UltraPerformance;
+        set
+        {
+            settings.UltraPerformance = value;
+            settings.Save();
+            Theme.Still = value;
+            if (value)
+            {
+                artRequest?.Cancel();
+                waveform = [];
+                Spectrum = new float[24];
+                WaveformChanged?.Invoke();
+                Theme.Apply(Palette.Default);
+            }
+            else if (current is not null)
+            {
+                _ = LoadTrackVisualsAsync(current);
+            }
+            PushTap();
+            PushMedia();
+            ArtChanged?.Invoke();
+            Changed();
+        }
+    }
+
     public bool CheckForUpdates
     {
         get => settings.CheckForUpdates;
@@ -247,7 +279,7 @@ public sealed class Player : INotifyPropertyChanged, IDisposable
     public bool FollowCover
     {
         get => settings.FollowCover;
-        set { settings.FollowCover = value; settings.Save(); Theme.Apply(value ? art.Palette : Palette.Default); Changed(); }
+        set { settings.FollowCover = value; settings.Save(); Theme.Apply(value && !Theme.Still ? art.Palette : Palette.Default); Changed(); }
     }
 
     public bool BlockAds
@@ -320,6 +352,7 @@ public sealed class Player : INotifyPropertyChanged, IDisposable
             bands = settings.Bands.Select(b => new { type = b.Type, freq = b.Freq, gain = b.Gain, q = b.Q }),
             boost = settings.Boost,
             level = settings.EvenLoudness,
+            meter = !settings.UltraPerformance,
         },
     });
 
@@ -353,27 +386,79 @@ public sealed class Player : INotifyPropertyChanged, IDisposable
         Library.Save();
     }
 
-    public async Task StartUpAsync(bool resume)
+    public async Task StartUpAsync(bool resume, bool recovered = false)
     {
         Host.Send(new { cmd = "volume", v = settings.Volume });
         PushTap();
         SignedIn = await Host.IsSignedInAsync();
-        coverTimer.Tick += (_, _) => _ = RefreshCoversAsync();
+        _ = FindAccountNameAsync();
+        coverTimer.Tick += (_, _) => { if (!Theme.Still) _ = RefreshCoversAsync(); };
         coverTimer.Start();
-        _ = RefreshCoversAsync();
-        if (resume && settings.ResumeOnStart && settings.WasPlaying && current is not null)
+        if (!Theme.Still)
+            _ = RefreshCoversAsync();
+        if (resume && (settings.ResumeOnStart || recovered) && settings.WasPlaying && current is not null)
+        {
             Resume();
+        }
+        else if (current is not null)
+        {
+            // ready before anyone asks, so the first press of play has less to wait for
+            Host.Send(new { cmd = "preload", id = current.Id, url = Url(current) });
+        }
     }
 
     public async Task RefreshSignInAsync()
     {
         SignedIn = await Host.IsSignedInAsync();
+        await FindAccountNameAsync();
     }
 
     public void SignOut()
     {
         Host.SignOut();
         SignedIn = false;
+        settings.AccountName = null;
+        settings.Save();
+        Changed(nameof(AccountName));
+    }
+
+    async Task FindAccountNameAsync()
+    {
+        if (!SignedIn || settings.AccountName is not null)
+            return;
+        try
+        {
+            if (await Host.FindUserAsync() is not { Length: > 0 } user)
+                return;
+            var (title, owner, _) = await ArtworkService.DescribeAsync("https://soundcloud.com/" + user, CancellationToken.None);
+            settings.AccountName = owner ?? title ?? user;
+            settings.Save();
+            Changed(nameof(AccountName));
+        }
+        catch (Exception)
+        {
+        }
+    }
+
+    readonly DispatcherTimer slowLoad = new() { Interval = TimeSpan.FromMilliseconds(300) };
+
+    void SetLoading(bool value)
+    {
+        loading = value;
+        Changed(nameof(IsLoading));
+        slowLoad.Stop();
+        if (value)
+            slowLoad.Start();
+        else
+            SetLoadingSlowly(false);
+    }
+
+    void SetLoadingSlowly(bool value)
+    {
+        if (IsLoadingSlowly == value)
+            return;
+        IsLoadingSlowly = value;
+        Changed(nameof(IsLoadingSlowly));
     }
 
     public void AttachMediaControls(IntPtr window)
@@ -461,12 +546,11 @@ public sealed class Player : INotifyPropertyChanged, IDisposable
 
         SetCurrent(track);
         position = at;
-        loading = true;
         handedOff = false;
         counted = false;
         lastProgress = Environment.TickCount64;
         watchdog.Start();
-        Changed(nameof(IsLoading));
+        SetLoading(true);
         Host.Send(new { cmd = "play", id, url = Url(track), fade, at });
     }
 
@@ -493,6 +577,8 @@ public sealed class Player : INotifyPropertyChanged, IDisposable
     async Task LoadTrackVisualsAsync(Track track)
     {
         artRequest?.Cancel();
+        if (Theme.Still)
+            return;
         var cts = artRequest = new CancellationTokenSource();
         _ = LoadWaveformAsync(track, cts);
 
@@ -519,6 +605,8 @@ public sealed class Player : INotifyPropertyChanged, IDisposable
 
     public void Toggle()
     {
+        if (loading)
+            return;
         if (playing)
             Pause();
         else
@@ -730,10 +818,9 @@ public sealed class Player : INotifyPropertyChanged, IDisposable
             return;
         }
 
-        loading = false;
+        SetLoading(false);
         engineHasTrack = true;
         failures = 0;
-        Changed(nameof(IsLoading));
         SetPlaying(true);
         lastProgress = Environment.TickCount64;
 
@@ -811,8 +898,7 @@ public sealed class Player : INotifyPropertyChanged, IDisposable
         }
 
         // A song that can't play leaves this round without stopping the music.
-        loading = false;
-        Changed(nameof(IsLoading));
+        SetLoading(false);
         queue.Remove(id);
         if (why == "preview" && Library.Tracks.TryGetValue(id, out var track))
         {
@@ -860,6 +946,7 @@ public sealed class Player : INotifyPropertyChanged, IDisposable
             return;
         playing = value;
         settings.WasPlaying = value;
+        settings.Save();
         if (!value)
             Spectrum = new float[24];
         Changed(nameof(IsPlaying));
@@ -879,7 +966,7 @@ public sealed class Player : INotifyPropertyChanged, IDisposable
     {
         if (current is null)
             return;
-        media?.Show(current.Title, current.Artist, listenLabel ?? "Riffle", art.Bytes);
+        media?.Show(current.Title, current.Artist, listenLabel ?? "Riffle", Theme.Still ? null : art.Bytes);
     }
 
     static string Clock(double ms)

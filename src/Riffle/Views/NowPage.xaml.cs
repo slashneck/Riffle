@@ -28,6 +28,7 @@ public partial class NowPage : UserControl
         DataContext = target;
         player.PropertyChanged += OnChanged;
         player.ArtChanged += () => ShowArt(animate: true);
+        Theme.StaticPropertyChanged += (_, e) => { if (e.PropertyName == nameof(Theme.Accent)) UpdateSleep(); };
         player.WaveformChanged += () => Wave.SetSamples(player.Waveform);
         Wave.SeekRequested += player.SeekFraction;
         Wave.Scrubbing += player.ScrubTo;
@@ -36,6 +37,7 @@ public partial class NowPage : UserControl
         UpdateVolume();
         UpdateStatus();
         UpdateSleep();
+        UpdateStill();
     }
 
     void OnChanged(object? sender, PropertyChangedEventArgs e)
@@ -43,9 +45,15 @@ public partial class NowPage : UserControl
         switch (e.PropertyName)
         {
             case nameof(Player.IsPlaying):
-            case nameof(Player.IsLoading):
                 UpdatePlay();
                 UpdateStatus();
+                break;
+            case nameof(Player.IsLoadingSlowly):
+                UpdateLoading();
+                UpdateStatus();
+                break;
+            case nameof(Player.UltraPerformance):
+                UpdateStill();
                 break;
             case nameof(Player.Volume):
                 UpdateVolume();
@@ -68,7 +76,20 @@ public partial class NowPage : UserControl
         AutomationProperties.SetName(PlayButton, player.IsPlaying ? "Pause" : "Play");
     }
 
-    void UpdateStatus() => Status.Text = player.Notice.Length > 0 ? player.Notice : player.RoundLabel;
+    // A song that takes its time: the button rests and says so.
+    void UpdateLoading()
+    {
+        bool slow = player.IsLoadingSlowly;
+        PlayButton.IsEnabled = !slow;
+        Spinner.Visibility = slow ? Visibility.Visible : Visibility.Collapsed;
+        SpinnerTurn.BeginAnimation(RotateTransform.AngleProperty, slow && !Theme.Still
+            ? new DoubleAnimation(0, 360, TimeSpan.FromSeconds(1.1)) { RepeatBehavior = RepeatBehavior.Forever }
+            : null);
+    }
+
+    void UpdateStill() => PlayButton.Tag = Theme.Still ? "Still" : "Moves";
+
+    void UpdateStatus() => Status.Text = player.Notice.Length > 0 ? player.Notice : player.IsLoadingSlowly ? "Loading song" : player.RoundLabel;
 
     void UpdateVolume()
     {
@@ -84,8 +105,18 @@ public partial class NowPage : UserControl
 
     void ShowArt(bool animate)
     {
-        var (next, nextBorder, oldBorder) = showingA ? (CoverBrushB, CoverB, CoverA) : (CoverBrushA, CoverA, CoverB);
-        next.ImageSource = player.Art.Image;
+        var (nextBorder, oldBorder) = showingA ? (CoverB, CoverA) : (CoverA, CoverB);
+        if (Theme.Still)
+        {
+            nextBorder.BeginAnimation(OpacityProperty, null);
+            oldBorder.BeginAnimation(OpacityProperty, null);
+            CoverA.Background = CoverB.Background = null;
+            return;
+        }
+
+        var picture = new ImageBrush(player.Art.Image) { Stretch = Stretch.UniformToFill };
+        picture.Freeze();
+        nextBorder.Background = picture;
         showingA = !showingA;
 
         var time = animate ? TimeSpan.FromMilliseconds(700) : TimeSpan.Zero;

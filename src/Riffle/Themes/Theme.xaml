@@ -86,40 +86,43 @@
                 <ScaleTransform />
             </Setter.Value>
         </Setter>
+        <Setter Property="Tag" Value="Moves" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
                     <Grid>
-                        <Ellipse Fill="{Binding Source={x:Static themes:Theme.Accent}}">
-                            <Ellipse.CacheMode>
-                                <BitmapCache />
-                            </Ellipse.CacheMode>
-                            <Ellipse.Effect>
-                                <DropShadowEffect BlurRadius="28" ShadowDepth="0" Opacity="0.55"
-                                                  Color="{Binding Color, Source={x:Static themes:Theme.Glow}}" />
-                            </Ellipse.Effect>
-                        </Ellipse>
+                        <Ellipse x:Name="Halo" Margin="-26" IsHitTestVisible="False" Fill="{Binding Path=(themes:Theme.GlowHalo)}" />
+                        <Ellipse x:Name="Face" Fill="{Binding Path=(themes:Theme.Accent)}" />
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Grid>
                     <ControlTemplate.Triggers>
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Trigger.EnterActions>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="Halo" Property="Visibility" Value="Collapsed" />
+                            <Setter TargetName="Face" Property="Fill" Value="{StaticResource ChipHoverBrush}" />
+                            <Setter Property="Foreground" Value="{StaticResource MutedTextBrush}" />
+                        </Trigger>
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="IsMouseOver" Value="True" />
+                                <Condition Property="Tag" Value="Moves" />
+                            </MultiTrigger.Conditions>
+                            <MultiTrigger.EnterActions>
                                 <BeginStoryboard>
                                     <Storyboard>
                                         <DoubleAnimation Storyboard.TargetProperty="RenderTransform.ScaleX" To="1.05" Duration="0:0:0.18" />
                                         <DoubleAnimation Storyboard.TargetProperty="RenderTransform.ScaleY" To="1.05" Duration="0:0:0.18" />
                                     </Storyboard>
                                 </BeginStoryboard>
-                            </Trigger.EnterActions>
-                            <Trigger.ExitActions>
+                            </MultiTrigger.EnterActions>
+                            <MultiTrigger.ExitActions>
                                 <BeginStoryboard>
                                     <Storyboard>
                                         <DoubleAnimation Storyboard.TargetProperty="RenderTransform.ScaleX" To="1" Duration="0:0:0.25" />
                                         <DoubleAnimation Storyboard.TargetProperty="RenderTransform.ScaleY" To="1" Duration="0:0:0.25" />
                                     </Storyboard>
                                 </BeginStoryboard>
-                            </Trigger.ExitActions>
-                        </Trigger>
+                            </MultiTrigger.ExitActions>
+                        </MultiTrigger>
                         <Trigger Property="IsPressed" Value="True">
                             <Setter Property="Opacity" Value="0.85" />
                         </Trigger>
@@ -151,9 +154,9 @@
                             <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
                         </Trigger>
                         <Trigger Property="IsSelected" Value="True">
-                            <Setter TargetName="Chrome" Property="Background" Value="{Binding Source={x:Static themes:Theme.AccentSoft}}" />
-                            <Setter TargetName="Chrome" Property="BorderBrush" Value="{Binding Source={x:Static themes:Theme.AccentFaint}}" />
-                            <Setter Property="Foreground" Value="{Binding Source={x:Static themes:Theme.Accent}}" />
+                            <Setter TargetName="Chrome" Property="Background" Value="{Binding Path=(themes:Theme.AccentSoft)}" />
+                            <Setter TargetName="Chrome" Property="BorderBrush" Value="{Binding Path=(themes:Theme.AccentFaint)}" />
+                            <Setter Property="Foreground" Value="{Binding Path=(themes:Theme.Accent)}" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -173,7 +176,7 @@
                     <Grid Background="Transparent">
                         <ContentPresenter Margin="9,2,9,9" HorizontalAlignment="Center" />
                         <Border x:Name="Mark" Height="2" Width="14" CornerRadius="1" VerticalAlignment="Bottom"
-                                Background="{Binding Source={x:Static themes:Theme.Accent}}" Opacity="0" />
+                                Background="{Binding Path=(themes:Theme.Accent)}" Opacity="0" />
                     </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
@@ -231,7 +234,7 @@
                         <Track x:Name="PART_Track">
                             <Track.DecreaseRepeatButton>
                                 <RepeatButton Style="{StaticResource FlatRepeat}" Command="Slider.DecreaseLarge"
-                                              Background="{Binding Source={x:Static themes:Theme.Accent}}" />
+                                              Background="{Binding Path=(themes:Theme.Accent)}" />
                             </Track.DecreaseRepeatButton>
                             <Track.IncreaseRepeatButton>
                                 <RepeatButton Style="{StaticResource FlatRepeat}" Command="Slider.IncreaseLarge"
@@ -291,7 +294,7 @@
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
                             <TextBlock x:Name="Check" Text="&#xE73E;" FontFamily="{StaticResource IconFont}" FontSize="11"
-                                       Foreground="{Binding Source={x:Static themes:Theme.Accent}}" VerticalAlignment="Center" Visibility="Hidden" />
+                                       Foreground="{Binding Path=(themes:Theme.Accent)}" VerticalAlignment="Center" Visibility="Hidden" />
                             <TextBlock x:Name="Glyph" Text="{TemplateBinding Tag}" FontFamily="{StaticResource IconFont}" FontSize="12"
                                        Foreground="{StaticResource SubtleTextBrush}" VerticalAlignment="Center" />
                             <ContentPresenter Grid.Column="1" ContentSource="Header" VerticalAlignment="Center" RecognizesAccessKey="True" />
@@ -363,7 +366,7 @@
                     </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsChecked" Value="True">
-                            <Setter TargetName="Track" Property="Background" Value="{Binding Source={x:Static themes:Theme.Accent}}" />
+                            <Setter TargetName="Track" Property="Background" Value="{Binding Path=(themes:Theme.Accent)}" />
                             <Setter TargetName="Knob" Property="HorizontalAlignment" Value="Right" />
                             <Setter TargetName="Knob" Property="Fill" Value="{StaticResource BaseBrush}" />
                         </Trigger>
@@ -389,8 +392,8 @@
                             <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
                         </Trigger>
                         <Trigger Property="IsChecked" Value="True">
-                            <Setter TargetName="Chrome" Property="Background" Value="{Binding Source={x:Static themes:Theme.AccentSoft}}" />
-                            <Setter Property="Foreground" Value="{Binding Source={x:Static themes:Theme.Accent}}" />
+                            <Setter TargetName="Chrome" Property="Background" Value="{Binding Path=(themes:Theme.AccentSoft)}" />
+                            <Setter Property="Foreground" Value="{Binding Path=(themes:Theme.Accent)}" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -409,7 +412,7 @@
         <Setter Property="Background" Value="{StaticResource ChipBrush}" />
         <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
         <Setter Property="CaretBrush" Value="{StaticResource TextBrush}" />
-        <Setter Property="SelectionBrush" Value="{Binding Source={x:Static themes:Theme.Accent}}" />
+        <Setter Property="SelectionBrush" Value="{Binding Path=(themes:Theme.Accent)}" />
         <Setter Property="FontSize" Value="12" />
         <Setter Property="Padding" Value="8,6" />
         <Setter Property="Template">
@@ -428,7 +431,7 @@
                             <Setter TargetName="Hint" Property="Visibility" Value="Visible" />
                         </Trigger>
                         <Trigger Property="IsKeyboardFocused" Value="True">
-                            <Setter TargetName="Chrome" Property="BorderBrush" Value="{Binding Source={x:Static themes:Theme.AccentSoft}}" />
+                            <Setter TargetName="Chrome" Property="BorderBrush" Value="{Binding Path=(themes:Theme.AccentSoft)}" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -440,7 +443,7 @@
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="Focusable" Value="False" />
         <Setter Property="FontSize" Value="12" />
-        <Setter Property="Foreground" Value="{Binding Source={x:Static themes:Theme.Accent}}" />
+        <Setter Property="Foreground" Value="{Binding Path=(themes:Theme.Accent)}" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
@@ -518,7 +521,7 @@
                     <Grid Background="Transparent">
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                         <Border x:Name="Mark" Width="16" Height="2" CornerRadius="1" VerticalAlignment="Bottom" Margin="0,0,0,7"
-                                Background="{Binding Source={x:Static themes:Theme.Accent}}" Opacity="0" />
+                                Background="{Binding Path=(themes:Theme.Accent)}" Opacity="0" />
                     </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
@@ -545,7 +548,7 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
-                    <Border x:Name="Chrome" CornerRadius="23" Background="{Binding Source={x:Static themes:Theme.Accent}}">
+                    <Border x:Name="Chrome" CornerRadius="23" Background="{Binding Path=(themes:Theme.Accent)}">
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Border>
                     <ControlTemplate.Triggers>
@@ -607,7 +610,7 @@
                     <Grid Background="Transparent" Width="34">
                         <Track x:Name="PART_Track">
                             <Track.DecreaseRepeatButton>
-                                <RepeatButton Style="{StaticResource EqRepeat}" Command="Slider.DecreaseLarge" Background="{Binding Source={x:Static themes:Theme.Accent}}" />
+                                <RepeatButton Style="{StaticResource EqRepeat}" Command="Slider.DecreaseLarge" Background="{Binding Path=(themes:Theme.Accent)}" />
                             </Track.DecreaseRepeatButton>
                             <Track.IncreaseRepeatButton>
                                 <RepeatButton Style="{StaticResource EqRepeat}" Command="Slider.IncreaseLarge" Background="{StaticResource ChipHoverBrush}" />

@@ -339,6 +339,12 @@ public sealed class EqCurve : FrameworkElement
         e.Handled = true;
     }
 
+    protected override void OnInitialized(EventArgs e)
+    {
+        base.OnInitialized(e);
+        Theme.StaticPropertyChanged += (_, change) => { if (change.PropertyName == nameof(Theme.Accent)) InvalidateVisual(); };
+    }
+
     static Brush Frozen(Color color)
     {
         var brush = new SolidColorBrush(color);

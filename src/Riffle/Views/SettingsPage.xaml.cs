@@ -21,7 +21,7 @@ public partial class SettingsPage : UserControl
         player = target;
         window = owner;
         DataContext = target;
-        VersionText.Text = $"Riffle {Assembly.GetExecutingAssembly().GetName().Version?.ToString(3)}";
+        VersionText.Text = $"Riffle {Assembly.GetExecutingAssembly().GetName().Version?.ToString(3)} beta";
 
         player.PropertyChanged += OnChanged;
         IsVisibleChanged += (_, _) => { if (IsVisible) Fill(); };
@@ -79,7 +79,7 @@ public partial class SettingsPage : UserControl
 
     void OnChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName is nameof(Player.NeverCount) or nameof(Player.SignedIn) or nameof(Player.AdsBlocked))
+        if (e.PropertyName is nameof(Player.NeverCount) or nameof(Player.SignedIn) or nameof(Player.AccountName) or nameof(Player.AdsBlocked))
             Fill();
     }
 
@@ -94,7 +94,7 @@ public partial class SettingsPage : UserControl
         NeverText.Text = never == 0 ? "No songs blocked" : never == 1 ? "1 song blocked" : $"{never:N0} songs blocked";
         NeverButton.Visibility = never > 0 ? Visibility.Visible : Visibility.Collapsed;
 
-        AccountText.Text = player.SignedIn ? "Signed in to SoundCloud" : "Not signed in";
+        AccountText.Text = !player.SignedIn ? "Not signed in" : player.AccountName is { } name ? $"Signed in as {name}" : "Signed in to SoundCloud";
         SignOutButton.Visibility = player.SignedIn ? Visibility.Visible : Visibility.Collapsed;
         AdsToggle.Content = player.AdsBlocked > 0 ? $"Block ads  ·  {player.AdsBlocked:N0} blocked" : "Block ads";
 

@@ -15,6 +15,8 @@ public sealed class Settings
     public int LongestMinutes { get; set; }
     public bool BlockAds { get; set; } = true;
     public bool CheckForUpdates { get; set; } = true;
+    public bool UltraPerformance { get; set; }
+    public string? AccountName { get; set; }
     public bool EvenLoudness { get; set; }
     public string EqPreset { get; set; } = "Flat";
     public List<Riffle.Core.EqBand> Bands { get; set; } = Riffle.Core.EqBand.Default();

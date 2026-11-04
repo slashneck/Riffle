@@ -85,6 +85,7 @@ if (location.hostname === 'w.soundcloud.com') {
 
       let loud = 0;
       setInterval(() => {
+        if (settings.meter === false && !settings.level) return;
         chain.analyser.getByteFrequencyData(bins);
         const bands = [];
         let any = 0;
@@ -97,7 +98,7 @@ if (location.hostname === 'w.soundcloud.com') {
           bands.push(Math.round(v * 100) / 100);
           any = Math.max(any, v);
         }
-        if (any > 0) send({ riffle: 'spectrum', bands });
+        if (any > 0 && settings.meter !== false) send({ riffle: 'spectrum', bands });
 
         if (!settings.level) return;
         // Even out loudness: only ever turns loud tracks down, never boosts quiet ones.

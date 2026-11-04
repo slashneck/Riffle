@@ -78,6 +78,15 @@ public partial class MainWindow : Window
         foreach (FrameworkElement child in Pages.Children)
             child.Visibility = child == show ? Visibility.Visible : Visibility.Collapsed;
 
+        if (Theme.Still)
+        {
+            show.BeginAnimation(OpacityProperty, null);
+            show.RenderTransform = Transform.Identity;
+            if (show == QueueView)
+                QueueView.Refresh();
+            return;
+        }
+
         var time = TimeSpan.FromMilliseconds(180);
         show.RenderTransform = new TranslateTransform(0, 6);
         show.RenderTransform.BeginAnimation(TranslateTransform.YProperty,
@@ -131,7 +140,8 @@ public partial class MainWindow : Window
         if (handle != IntPtr.Zero)
             Native.SetForegroundWindow(handle);
 
-        BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(120)));
+        if (!Theme.Still)
+            BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(120)));
     }
 
     internal void ToggleFlyout(Native.RECT? anchor = null)

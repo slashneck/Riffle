@@ -52,7 +52,7 @@ public sealed class LevelBars : FrameworkElement
 
     void Wake()
     {
-        if (IsVisible && !hooked)
+        if (IsVisible && !hooked && !Riffle.Themes.Theme.Still)
         {
             lastFrame = TimeSpan.Zero;
             CompositionTarget.Rendering += OnFrame;

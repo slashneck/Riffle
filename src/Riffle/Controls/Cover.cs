@@ -34,7 +34,7 @@ public static class Cover
 
         var url = (string?)e.NewValue;
         border.Background = (Brush)Application.Current.FindResource("ChipBrush");
-        if (url is null)
+        if (url is null || Riffle.Themes.Theme.Still)
             return;
 
         // rows flying past while scrolling shouldn't each start a download
