@@ -12,6 +12,7 @@ public sealed class Track
     public string? Wave { get; set; }
     public int Seconds { get; set; }
     public string? Policy { get; set; }
+    public string? Secret { get; set; }
 
     // Previews and blocked tracks can't be played in full, so they never enter a shuffle.
     public bool IsPlayable => Policy is not ("SNIP" or "BLOCK");
@@ -108,8 +109,11 @@ public static class Links
 
         // a song opened from inside a playlist: the link still says which playlist
         var inside = System.Web.HttpUtility.ParseQueryString(uri.Query)["in"];
-        if (inside is not null && inside.Split('/', StringSplitOptions.RemoveEmptyEntries) is [var owner, "sets", var set, ..])
-            return new(LinkKind.Playlist, $"https://soundcloud.com/{owner}/sets/{set}", owner);
+        if (inside is not null && inside.Split('/', StringSplitOptions.RemoveEmptyEntries) is [var owner, "sets", var set, .. var rest])
+        {
+            var key = rest.Length > 0 && rest[0].StartsWith("s-", StringComparison.Ordinal) ? "/" + rest[0] : "";
+            return new(LinkKind.Playlist, $"https://soundcloud.com/{owner}/sets/{set}{key}", owner);
+        }
 
         var user = parts[0];
         var baseUrl = $"https://soundcloud.com/{user}";

@@ -63,7 +63,7 @@ public sealed class Player : INotifyPropertyChanged, IDisposable
     readonly DispatcherTimer saver = new() { Interval = TimeSpan.FromSeconds(20) };
     readonly DispatcherTimer sleepTimer = new() { Interval = TimeSpan.FromSeconds(5) };
     readonly DispatcherTimer coverTimer = new() { Interval = TimeSpan.FromMinutes(30) };
-    readonly Dictionary<string, (SourceTile Tile, List<Track> Parts, TaskCompletionSource<bool> Done)> collecting = [];
+    readonly Dictionary<string, (SourceTile Tile, List<Track> Parts, TaskCompletionSource<bool> Done, bool Manual)> collecting = [];
     MediaControls? media;
     CancellationTokenSource? artRequest;
     CancellationTokenSource? noticeTimer;
@@ -146,6 +146,7 @@ public sealed class Player : INotifyPropertyChanged, IDisposable
     public string? AccountName => settings.AccountName;
     public bool HasSources => Tiles.Count > 0;
     public bool HasQueue => queue.Count > 0;
+    public bool HasTrack => current is not null;
     public double Position => position;
     public double Duration => duration;
     public double Progress => duration > 0 ? Math.Clamp(position / duration, 0, 1) : 0;
@@ -268,6 +269,24 @@ public sealed class Player : INotifyPropertyChanged, IDisposable
             ArtChanged?.Invoke();
             Changed();
         }
+    }
+
+    public bool OverlayOnChange
+    {
+        get => settings.OverlayOnChange;
+        set { settings.OverlayOnChange = value; settings.Save(); Changed(); }
+    }
+
+    public bool OverlayAlways
+    {
+        get => settings.OverlayAlways;
+        set { settings.OverlayAlways = value; settings.Save(); Changed(); }
+    }
+
+    public string OverlayCorner
+    {
+        get => settings.OverlayCorner;
+        set { settings.OverlayCorner = value; settings.Save(); Changed(); }
     }
 
     public bool CheckForUpdates
@@ -572,7 +591,10 @@ public sealed class Player : INotifyPropertyChanged, IDisposable
         PushMedia();
     }
 
-    static string Url(Track track) => track.Link ?? $"https://api.soundcloud.com/tracks/{track.Id}";
+    // A private song only plays with the key that came with its private link.
+    static string Url(Track track) => track.Secret is { Length: > 0 } secret
+        ? $"https://api.soundcloud.com/tracks/{track.Id}?secret_token={Uri.EscapeDataString(secret)}"
+        : track.Link ?? $"https://api.soundcloud.com/tracks/{track.Id}";
 
     async Task LoadTrackVisualsAsync(Track track)
     {
@@ -1133,7 +1155,7 @@ public sealed class Player : INotifyPropertyChanged, IDisposable
     // Only a few at once, the embed takes a moment per list and there's no rush.
     readonly SemaphoreSlim syncSlots = new(3);
 
-    public async Task SyncAsync(SourceTile tile)
+    public async Task SyncAsync(SourceTile tile, bool manual = false)
     {
         var source = tile.Source;
         if (collecting.ContainsKey(source.Id))
@@ -1141,7 +1163,7 @@ public sealed class Player : INotifyPropertyChanged, IDisposable
 
         tile.Status = "Waiting";
         var done = new TaskCompletionSource<bool>();
-        collecting[source.Id] = (tile, [], done);
+        collecting[source.Id] = (tile, [], done, manual);
 
         await syncSlots.WaitAsync();
         try
@@ -1164,6 +1186,13 @@ public sealed class Player : INotifyPropertyChanged, IDisposable
         }
     }
 
+    static async Task ClearStatusLaterAsync(SourceTile tile)
+    {
+        await Task.Delay(4000);
+        if (tile.Status is "Up to date" || tile.Status.EndsWith("new songs", StringComparison.Ordinal) || tile.Status == "1 new song")
+            tile.Status = "";
+    }
+
     public void SyncAll()
     {
         foreach (var tile in Tiles.ToList())
@@ -1178,13 +1207,17 @@ public sealed class Player : INotifyPropertyChanged, IDisposable
         var source = job.Tile.Source;
         if (ok && job.Parts.Count > 0)
         {
+            var before = source.Tracks.ToHashSet();
             source.Tracks = job.Parts.Select(t => t.Id).Distinct().ToList();
+            int added = before.Count == 0 ? 0 : source.Tracks.Count(t => !before.Contains(t));
             foreach (var track in job.Parts)
                 Library.Tracks[track.Id] = track;
             source.Synced = DateTime.UtcNow;
             ChooseCover(source, source.Art);
-            job.Tile.Status = "";
+            job.Tile.Status = job.Manual ? added switch { 0 => "Up to date", 1 => "1 new song", _ => $"{added} new songs" } : "";
             job.Tile.Refresh();
+            if (job.Manual)
+                _ = ClearStatusLaterAsync(job.Tile);
 
             // something new in a playlist that's playing joins the current round
             if (Library.Selected.Contains(id))
@@ -1193,7 +1226,9 @@ public sealed class Player : INotifyPropertyChanged, IDisposable
         }
         else
         {
-            job.Tile.Status = source.Tracks.Count > 0 ? "" : "Couldn't load this one";
+            job.Tile.Status = source.Tracks.Count > 0 ? "" : source.Url.Contains("/s-", StringComparison.Ordinal) || !SignedIn
+                ? "Couldn't load this one"
+                : "Private? Paste its private link";
         }
         SelectionChanged();
         job.Done.TrySetResult(ok);
@@ -1213,6 +1248,7 @@ public sealed class Player : INotifyPropertyChanged, IDisposable
             Wave = Text(t, "wave"),
             Seconds = t.TryGetProperty("seconds", out var s) && s.ValueKind == JsonValueKind.Number ? s.GetInt32() : 0,
             Policy = Text(t, "policy"),
+            Secret = Text(t, "secret"),
         };
     }
 

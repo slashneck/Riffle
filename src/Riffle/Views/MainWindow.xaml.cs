@@ -45,6 +45,8 @@ public partial class MainWindow : Window
 
     public void AttachUpdates(Services.UpdateService updates) => SettingsView.AttachUpdates(updates);
 
+    public void AttachShortcuts(Services.Shortcuts shortcuts) => SettingsView.AttachShortcuts(shortcuts);
+
     public void RequestQuit() => QuitRequested?.Invoke();
 
     // lets a window of ours take focus (signing in) without the flyout closing under it
@@ -164,6 +166,8 @@ public partial class MainWindow : Window
 
     void OnKey(object sender, KeyEventArgs e)
     {
+        if (e.OriginalSource is Controls.HotkeyBox { IsRecording: true })
+            return;
         if (e.OriginalSource is TextBox)
         {
             if (e.Key == Key.Escape)

@@ -16,6 +16,8 @@ public partial class App : Application
     Player? player;
     MainWindow? main;
     TaskbarWidget? widget;
+    OverlayWindow? overlay;
+    Shortcuts? shortcuts;
 
     protected override async void OnStartup(StartupEventArgs e)
     {
@@ -72,6 +74,16 @@ public partial class App : Application
 
         main.AttachUpdates(new UpdateService(() => player.CheckForUpdates, () => player.IsPlaying, Quit));
 
+        overlay = new OverlayWindow(player);
+        shortcuts = new Shortcuts(new WindowInteropHelper(main).Handle, settings, new Dictionary<string, Action>
+        {
+            ["Show"] = overlay.ShowBriefly,
+            ["Toggle"] = player.Toggle,
+            ["Next"] = player.Next,
+            ["Previous"] = player.Previous,
+        });
+        main.AttachShortcuts(shortcuts);
+
         // started with Windows: just the tile, no window popping up
         if (!e.Args.Contains(Autostart.Flag) || !player.ShowTile)
             main.ShowFlyout(widget.Bounds);
@@ -108,11 +120,25 @@ public partial class App : Application
 
     void Quit()
     {
+        shortcuts?.Dispose();
+        overlay?.Close();
         widget?.Close();
         main?.CloseForGood();
         player?.Dispose();
+        int browser = host?.BrowserProcess ?? 0;
         host?.Dispose();
         instance?.Dispose();
         Shutdown();
+
+        // The player's browser normally closes with its window. If it hangs on, it goes too.
+        if (browser > 0)
+        {
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(3000);
+                try { System.Diagnostics.Process.GetProcessById(browser).Kill(entireProcessTree: true); }
+                catch (Exception) { }
+            });
+        }
     }
 }

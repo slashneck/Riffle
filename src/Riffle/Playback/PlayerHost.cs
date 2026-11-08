@@ -34,6 +34,7 @@ public sealed partial class PlayerHost : IDisposable
     public bool BlockAds { get; set; } = true;
     public int AdsBlocked { get; private set; }
     public string? LastUser { get; private set; }
+    public int BrowserProcess => view.CoreWebView2 is { } web ? (int)web.BrowserProcessId : 0;
     public CoreWebView2Environment? Environment => environment;
 
     public event Action<JsonElement>? Message;

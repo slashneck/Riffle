@@ -47,6 +47,24 @@
                 <CheckBox Style="{StaticResource Toggle}" Content="Ultra performance" IsChecked="{Binding UltraPerformance}"
                           ToolTip="No covers, no animations, no level meter. Just the music." />
 
+                <TextBlock Text="Hotkeys and overlay" Style="{StaticResource SectionTitle}" />
+                <ItemsControl x:Name="HotkeyRows" />
+                <CheckBox Style="{StaticResource Toggle}" Content="Show it when the song changes" IsChecked="{Binding OverlayOnChange}" Margin="0,4,0,0" />
+                <CheckBox Style="{StaticResource Toggle}" Content="Keep it on screen" IsChecked="{Binding OverlayAlways}" />
+                <Grid Margin="0,6">
+                    <TextBlock Text="Corner" FontSize="12.5" VerticalAlignment="Center" />
+                    <Border Style="{StaticResource SegmentGroup}">
+                        <StackPanel Orientation="Horizontal">
+                            <RadioButton x:Name="CornerTopLeft" Style="{StaticResource Segment}" GroupName="corner" Content="Top left" Tag="TopLeft" Checked="OnCorner" />
+                            <RadioButton x:Name="CornerTopRight" Style="{StaticResource Segment}" GroupName="corner" Content="Top right" Tag="TopRight" Checked="OnCorner" />
+                            <RadioButton x:Name="CornerBottomLeft" Style="{StaticResource Segment}" GroupName="corner" Content="Bottom left" Tag="BottomLeft" Checked="OnCorner" />
+                            <RadioButton x:Name="CornerBottomRight" Style="{StaticResource Segment}" GroupName="corner" Content="Bottom right" Tag="BottomRight" Checked="OnCorner" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
+                <TextBlock Style="{StaticResource Note}" TextWrapping="Wrap" Margin="0,2,0,0"
+                           Text="Works over games in borderless or windowed mode. Exclusive fullscreen draws over everything." />
+
                 <TextBlock Text="Account" Style="{StaticResource SectionTitle}" />
                 <Grid Margin="0,2">
                     <TextBlock x:Name="AccountText" FontSize="12.5" VerticalAlignment="Center" />

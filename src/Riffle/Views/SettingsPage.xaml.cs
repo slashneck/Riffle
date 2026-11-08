@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
+using Riffle.Controls;
 using Riffle.Playback;
 using Riffle.Services;
 
@@ -12,6 +13,8 @@ public partial class SettingsPage : UserControl
     Player player = null!;
     MainWindow window = null!;
     UpdateService? updates;
+    Shortcuts? shortcuts;
+    readonly List<HotkeyBox> boxes = [];
     bool filling;
 
     public SettingsPage() => InitializeComponent();
@@ -26,6 +29,44 @@ public partial class SettingsPage : UserControl
         player.PropertyChanged += OnChanged;
         IsVisibleChanged += (_, _) => { if (IsVisible) Fill(); };
         Fill();
+    }
+
+    public void AttachShortcuts(Shortcuts service)
+    {
+        shortcuts = service;
+        HotkeyBox.RecordingChanged += recording => { if (recording) shortcuts.Pause(); else shortcuts.Apply(); };
+        foreach (var (id, label) in Shortcuts.Actions)
+        {
+            var box = new HotkeyBox { Tag = id, Style = (Style)FindResource("TextButton"), HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 0, -8, 0) };
+            box.Picked += (picked, key) =>
+            {
+                shortcuts.Set((string)picked.Tag, key);
+                ShowHotkeys();
+            };
+            boxes.Add(box);
+            var row = new Grid { Margin = new Thickness(0, 2, 0, 2) };
+            row.Children.Add(new TextBlock { Text = label, FontSize = 12.5, VerticalAlignment = VerticalAlignment.Center });
+            row.Children.Add(box);
+            HotkeyRows.Items.Add(row);
+        }
+        ShowHotkeys();
+    }
+
+    void ShowHotkeys()
+    {
+        if (shortcuts is null)
+            return;
+        foreach (var box in boxes)
+        {
+            var id = (string)box.Tag;
+            box.SetValue(shortcuts.Get(id), shortcuts.Taken.Contains(id));
+        }
+    }
+
+    void OnCorner(object sender, RoutedEventArgs e)
+    {
+        if (!filling && sender is RadioButton { Tag: string corner })
+            player.OverlayCorner = corner;
     }
 
     public void AttachUpdates(UpdateService service)
@@ -89,6 +130,7 @@ public partial class SettingsPage : UserControl
 
         (player.Mode switch { "SpreadArtists" => ModeSpread, "FreshFirst" => ModeFresh, _ => ModeTrue }).IsChecked = true;
         (player.LongestMinutes switch { 15 => Long15, 30 => Long30, _ => LongOff }).IsChecked = true;
+        (player.OverlayCorner switch { "TopLeft" => CornerTopLeft, "BottomLeft" => CornerBottomLeft, "BottomRight" => CornerBottomRight, _ => CornerTopRight }).IsChecked = true;
 
         int never = player.NeverCount;
         NeverText.Text = never == 0 ? "No songs blocked" : never == 1 ? "1 song blocked" : $"{never:N0} songs blocked";

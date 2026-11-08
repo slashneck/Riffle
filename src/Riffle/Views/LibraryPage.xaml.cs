@@ -33,7 +33,11 @@ public partial class LibraryPage : UserControl
     Point pressedAt;
     bool dragged;
 
-    public LibraryPage() => InitializeComponent();
+    public LibraryPage()
+    {
+        InitializeComponent();
+        IsVisibleChanged += (_, _) => { if (!IsVisible) Picker.Visibility = Visibility.Collapsed; };
+    }
 
     public void Attach(Player target, MainWindow owner)
     {
@@ -143,8 +147,7 @@ public partial class LibraryPage : UserControl
             window.HoldOpen(false);
             await player.RefreshSignInAsync();
             window.ShowFlyout();
-            if (!player.SignedIn)
-                return;
+            return;
         }
 
         await ShowPickerAsync(default, "https://soundcloud.com/you/sets");
@@ -255,6 +258,12 @@ public partial class LibraryPage : UserControl
             player.ToggleSource(tile);
     }
 
+    void OnRefreshTile(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: SourceTile tile })
+            _ = player.SyncAsync(tile, manual: true);
+    }
+
     void OnRemoveTile(object sender, RoutedEventArgs e)
     {
         if (sender is FrameworkElement { DataContext: SourceTile tile })
@@ -281,7 +290,7 @@ public partial class LibraryPage : UserControl
         menu.Items.Add(new Separator());
 
         var sync = new MenuItem { Header = "Check for new songs", Tag = "" };
-        sync.Click += (_, _) => _ = player.SyncAsync(tile);
+        sync.Click += (_, _) => _ = player.SyncAsync(tile, manual: true);
         menu.Items.Add(sync);
 
         var open = new MenuItem { Header = "Open on SoundCloud", Tag = "" };

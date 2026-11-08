@@ -16,6 +16,10 @@ public sealed class Settings
     public bool BlockAds { get; set; } = true;
     public bool CheckForUpdates { get; set; } = true;
     public bool UltraPerformance { get; set; }
+    public Dictionary<string, string> Hotkeys { get; set; } = [];
+    public bool OverlayOnChange { get; set; }
+    public bool OverlayAlways { get; set; }
+    public string OverlayCorner { get; set; } = "TopRight";
     public string? AccountName { get; set; }
     public bool EvenLoudness { get; set; }
     public string EqPreset { get; set; } = "Flat";

@@ -78,6 +78,10 @@
                                     Foreground="{StaticResource TextBrush}" Background="#990B0C0F"
                                     HorizontalAlignment="Left" VerticalAlignment="Top" Margin="11,11,0,0" Visibility="Collapsed"
                                     ToolTip="Remove from library" Click="OnRemoveTile" />
+                            <Button x:Name="RefreshButton" Style="{StaticResource IconButton}" Width="24" Height="24" FontSize="10" Content="&#xE72C;"
+                                    Foreground="{StaticResource TextBrush}" Background="#990B0C0F"
+                                    HorizontalAlignment="Left" VerticalAlignment="Top" Margin="39,11,0,0" Visibility="Collapsed"
+                                    ToolTip="Check for new songs" AutomationProperties.Name="Check for new songs" Click="OnRefreshTile" />
                         </Grid>
                         <DataTemplate.Triggers>
                             <DataTrigger Binding="{Binding Selected}" Value="True">
@@ -86,6 +90,7 @@
                             </DataTrigger>
                             <DataTrigger Binding="{Binding IsMouseOver, ElementName=TileRoot}" Value="True">
                                 <Setter TargetName="RemoveButton" Property="Visibility" Value="Visible" />
+                                <Setter TargetName="RefreshButton" Property="Visibility" Value="Visible" />
                             </DataTrigger>
                         </DataTemplate.Triggers>
                     </DataTemplate>

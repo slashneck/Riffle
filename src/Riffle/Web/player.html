@@ -112,7 +112,7 @@ function meta(sound) {
   if (!sound) return null;
   return {
     id: sound.id, title: sound.title, artist: sound.user && sound.user.username, art: sound.artwork_url || (sound.user && sound.user.avatar_url),
-    link: sound.permalink_url, wave: sound.waveform_url, seconds: Math.round((sound.full_duration || sound.duration || 0) / 1000), policy: sound.policy,
+    link: sound.permalink_url, wave: sound.waveform_url, seconds: Math.round((sound.full_duration || sound.duration || 0) / 1000), policy: sound.policy, secret: sound.secret_token || null,
     preview: !!(sound.duration && sound.full_duration && sound.duration < sound.full_duration - 1000),
   };
 }
