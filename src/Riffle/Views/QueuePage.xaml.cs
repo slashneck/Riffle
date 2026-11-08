@@ -38,7 +38,7 @@ public partial class QueuePage : UserControl
             tracks = tracks.Where(t => t.Title.Contains(term, StringComparison.OrdinalIgnoreCase) ||
                                        t.Artist.Contains(term, StringComparison.OrdinalIgnoreCase));
 
-        var list = tracks.ToList();
+        var list = tracks.Select(t => new QueueRow(t, queue.IsGuest(t.Id))).ToList();
         Rows.ItemsSource = list;
         Summary.Text = queue.Count == 0 ? "" : player.RoundLabel;
         Empty.Text = list.Count > 0 ? "" : term.Length > 0 ? "No matches" : ShowNext.IsChecked == true ? "Nothing queued yet" : "Nothing played yet";
@@ -63,8 +63,8 @@ public partial class QueuePage : UserControl
     {
         if (e.OriginalSource is not DependencyObject source || FindButton(source))
             return;
-        if (sender is FrameworkElement { DataContext: Track track })
-            player.PlayFromQueue(track.Id);
+        if (sender is FrameworkElement { DataContext: QueueRow row })
+            player.PlayFromQueue(row.Track.Id);
     }
 
     static bool FindButton(DependencyObject? node)
@@ -80,19 +80,19 @@ public partial class QueuePage : UserControl
 
     void OnPlayNext(object sender, RoutedEventArgs e)
     {
-        if (sender is FrameworkElement { DataContext: Track track })
-            player.PlayNextInQueue(track.Id);
+        if (sender is FrameworkElement { DataContext: QueueRow row })
+            player.PlayNextInQueue(row.Track.Id);
     }
 
     void OnNever(object sender, RoutedEventArgs e)
     {
-        if (sender is FrameworkElement { DataContext: Track track })
-            player.NeverPlay(track.Id);
+        if (sender is FrameworkElement { DataContext: QueueRow row })
+            player.NeverPlay(row.Track.Id);
     }
 
     void OnRowMenu(object sender, MouseButtonEventArgs e)
     {
-        if (sender is not FrameworkElement { DataContext: Track track } row)
+        if (sender is not FrameworkElement { DataContext: QueueRow { Track: var track } } row)
             return;
 
         var menu = new ContextMenu { PlacementTarget = row };
@@ -118,4 +118,13 @@ public partial class QueuePage : UserControl
         try { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }); }
         catch (Exception) { }
     }
+}
+
+// A row in the queue: the song, and whether the DJ put it there.
+public sealed record QueueRow(Track Track, bool Pick)
+{
+    public string Title => Track.Title;
+    public string Artist => Track.Artist;
+    public string? Art => Track.Art;
+    public string Length => Track.Length;
 }

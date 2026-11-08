@@ -180,6 +180,60 @@ public sealed partial class PlayerHost : IDisposable
         }
     }
 
+    // The songs SoundCloud lists as related to one song. Only used by the DJ.
+    public async Task<List<(string Path, string Title, string Artist)>> ScanRelatedAsync(string pageUrl)
+    {
+        var scanner = new WebView2();
+        var host = new Window
+        {
+            Width = 1200, Height = 1400, Left = -8000, Top = -8000, WindowStyle = WindowStyle.None,
+            ShowInTaskbar = false, ShowActivated = false, WindowStartupLocation = WindowStartupLocation.Manual,
+            Content = scanner, Title = "Riffle DJ",
+        };
+        host.Show();
+        Native.AddExStyle(new WindowInteropHelper(host).Handle, Native.WS_EX_TOOLWINDOW | Native.WS_EX_NOACTIVATE);
+
+        try
+        {
+            await scanner.EnsureCoreWebView2Async(environment);
+            scanner.CoreWebView2.IsMuted = true;
+            Watch(scanner.CoreWebView2);
+            var loaded = new TaskCompletionSource();
+            scanner.CoreWebView2.NavigationCompleted += (_, _) => loaded.TrySetResult();
+            scanner.CoreWebView2.Navigate(pageUrl);
+            await Task.WhenAny(loaded.Task, Task.Delay(20000));
+
+            const string read = """
+                (() => { window.scrollTo(0, document.body.scrollHeight);
+                  const found = [];
+                  for (const item of document.querySelectorAll('.soundList__item')) {
+                    const a = item.querySelector('a.soundTitle__title');
+                    if (!a) continue;
+                    const by = item.querySelector('.soundTitle__username');
+                    found.push([a.getAttribute('href') || '', (a.textContent || '').trim(), by ? (by.textContent || '').trim() : '']);
+                  }
+                  return JSON.stringify(found); })()
+                """;
+            var result = new List<(string, string, string)>();
+            int still = 0;
+            for (int pass = 0; pass < 8 && still < 2; pass++)
+            {
+                await Task.Delay(1400);
+                var raw = await scanner.CoreWebView2.ExecuteScriptAsync(read);
+                var list = JsonSerializer.Deserialize<List<List<string>>>(JsonSerializer.Deserialize<string>(raw) ?? "[]") ?? [];
+                still = list.Count == result.Count ? still + 1 : 0;
+                result = list.Where(e => e.Count == 3 && e[0].StartsWith('/') && e[0].Count(c => c == '/') == 2)
+                    .Select(e => (e[0], e[1], e[2])).Distinct().ToList();
+            }
+            return result;
+        }
+        finally
+        {
+            scanner.Dispose();
+            host.Close();
+        }
+    }
+
     // Reads the playlist links off a profile page. Only used when importing.
     public async Task<List<(string Url, string Title)>> ScanLinksAsync(string pageUrl, Action<int>? progress, CancellationToken token)
     {

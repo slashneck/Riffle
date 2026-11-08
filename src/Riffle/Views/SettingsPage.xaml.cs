@@ -17,7 +17,11 @@ public partial class SettingsPage : UserControl
     readonly List<HotkeyBox> boxes = [];
     bool filling;
 
-    public SettingsPage() => InitializeComponent();
+    public SettingsPage()
+    {
+        InitializeComponent();
+        IsVisibleChanged += (_, _) => { if (!IsVisible) BlockedPage.Visibility = Visibility.Collapsed; };
+    }
 
     public void Attach(Player target, MainWindow owner)
     {
@@ -130,11 +134,14 @@ public partial class SettingsPage : UserControl
 
         (player.Mode switch { "SpreadArtists" => ModeSpread, "FreshFirst" => ModeFresh, _ => ModeTrue }).IsChecked = true;
         (player.LongestMinutes switch { 15 => Long15, 30 => Long30, _ => LongOff }).IsChecked = true;
+        (player.DjAmount switch { "Light" => DjLight, "Heavy" => DjHeavy, "Raw" => DjRaw, _ => DjMedium }).IsChecked = true;
         (player.OverlayCorner switch { "TopLeft" => CornerTopLeft, "BottomLeft" => CornerBottomLeft, "BottomRight" => CornerBottomRight, _ => CornerTopRight }).IsChecked = true;
 
         int never = player.NeverCount;
         NeverText.Text = never == 0 ? "No songs blocked" : never == 1 ? "1 song blocked" : $"{never:N0} songs blocked";
         NeverButton.Visibility = never > 0 ? Visibility.Visible : Visibility.Collapsed;
+        if (BlockedPage.Visibility == Visibility.Visible)
+            FillBlocked();
 
         AccountText.Text = !player.SignedIn ? "Not signed in" : player.AccountName is { } name ? $"Signed in as {name}" : "Signed in to SoundCloud";
         SignOutButton.Visibility = player.SignedIn ? Visibility.Visible : Visibility.Collapsed;
@@ -160,7 +167,39 @@ public partial class SettingsPage : UserControl
             player.LongestMinutes = int.Parse(minutes);
     }
 
-    void OnClearNever(object sender, RoutedEventArgs e) => player.ClearNever();
+    void OnClearNever(object sender, RoutedEventArgs e)
+    {
+        FillBlocked();
+        BlockedPage.Visibility = Visibility.Visible;
+    }
+
+    void FillBlocked()
+    {
+        var songs = player.BlockedSongs;
+        BlockedList.ItemsSource = songs;
+        BlockedEmpty.Visibility = songs.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    void OnAllow(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: BlockedSong song })
+            player.Allow(song.Id);
+        FillBlocked();
+    }
+
+    void OnAllowAll(object sender, RoutedEventArgs e)
+    {
+        player.ClearNever();
+        FillBlocked();
+    }
+
+    void OnCloseBlocked(object sender, RoutedEventArgs e) => BlockedPage.Visibility = Visibility.Collapsed;
+
+    void OnDjAmount(object sender, RoutedEventArgs e)
+    {
+        if (!filling && sender is RadioButton { Tag: string amount })
+            player.DjAmount = amount;
+    }
 
     void OnSignOut(object sender, RoutedEventArgs e) => player.SignOut();
 

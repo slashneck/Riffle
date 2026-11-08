@@ -46,7 +46,8 @@ Riffle is a true shuffle for your SoundCloud. Paste your playlists, merge as man
 - **Sound.** A five band equalizer you drag by hand, with the music's spectrum behind it. Crossfades, and an option to even out loudness.
 - **Loud without distortion.** Normal, Loud and Blast all run through a limiter, and the volume slider follows how loud it actually sounds.
 - **A real queue.** Search it, play something next, and see your history.
-- **Never again.** Thumbs down a song and it stays out for good.
+- **A DJ.** One switch on the Now page mixes songs into your shuffle: ones you know but haven't heard in a while, and new ones related to what you play. Choose how much in Settings, from one pick every few songs to Raw, which plays only picks from what you've listened to. Keep a pick and it lands in a DJ finds playlist.
+- **Never again.** Thumbs down a song and it stays out for good. Settings lists every blocked song, so you can let one back in.
 - **Your place is kept.** Close it and pick up mid round tomorrow.
 - **Other shuffle styles.** Spread artists apart, or hear what you've played least first. Give a playlist more weight if you want more of it.
 - **Hotkeys and an overlay.** Set keys for play, pause, next and previous, and one that shows what's playing in a corner of the screen, over games too. All off until you set them.
@@ -74,6 +75,8 @@ Riffle is not made by or affiliated with SoundCloud.
 ## Privacy
 
 No telemetry and no analytics. For music Riffle only talks to SoundCloud: `soundcloud.com`, `w.soundcloud.com`, `api-widget.soundcloud.com`, `dwt.soundcloud.com`, `sndcdn.com` and `media-streaming.soundcloud.cloud`. Since the player is SoundCloud's own, SoundCloud sees what you play, like on their site.
+
+When the DJ is on, it opens SoundCloud's related tracks pages for a few of your songs in the background, to find new ones. SoundCloud sees those page visits like any other.
 
 For updates it asks `api.github.com` every few hours whether there's a new version and downloads it from `github.com`. You can switch that off in Settings.
 

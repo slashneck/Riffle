@@ -20,6 +20,10 @@ public sealed class Settings
     public bool OverlayOnChange { get; set; }
     public bool OverlayAlways { get; set; }
     public string OverlayCorner { get; set; } = "TopRight";
+    public bool DjOn { get; set; }
+    public string DjAmount { get; set; } = "Medium";
+    public double DjNewShare { get; set; } = 0.5;
+    public bool DjReasons { get; set; } = true;
     public string? AccountName { get; set; }
     public bool EvenLoudness { get; set; }
     public string EqPreset { get; set; } = "Flat";

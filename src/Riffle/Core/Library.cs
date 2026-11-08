@@ -13,6 +13,13 @@ public sealed class Library
     public HashSet<long> NeverPlay { get; set; } = [];
     public Dictionary<long, int> Plays { get; set; } = [];
     public QueueState? Queue { get; set; }
+    public Dictionary<long, DateTime> LastPlayed { get; set; } = [];
+    public Dictionary<long, int> Skips { get; set; } = [];
+    public Dictionary<long, DateTime> DjPicks { get; set; } = [];
+    public Dictionary<string, double> DjTaste { get; set; } = [];
+
+    // Picks you keep land in a playlist of Riffle's own.
+    public const string DjFindsUrl = "riffle:dj-finds";
     public int ResumeMs { get; set; }
     public int TotalPlays { get; set; }
     public double TotalMinutes { get; set; }

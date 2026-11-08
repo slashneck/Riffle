@@ -3,6 +3,34 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:themes="clr-namespace:Riffle.Themes"
              xmlns:controls="clr-namespace:Riffle.Controls">
+    <UserControl.Resources>
+        <Style x:Key="DjChip" TargetType="Button">
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Chrome" CornerRadius="13" Background="#A60B0C0F" BorderBrush="#26FFFFFF" BorderThickness="1" Padding="10,4,12,5">
+                            <StackPanel Orientation="Horizontal">
+                                <Ellipse x:Name="Dot" Width="7" Height="7" Margin="0,1,7,0" VerticalAlignment="Center" Fill="{StaticResource MutedTextBrush}" />
+                                <TextBlock x:Name="Label" Text="{TemplateBinding Content}" FontSize="11.5" FontWeight="SemiBold" Foreground="{StaticResource SubtleTextBrush}" />
+                            </StackPanel>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="Tag" Value="On">
+                                <Setter TargetName="Dot" Property="Fill" Value="{Binding Path=(themes:Theme.Accent)}" />
+                                <Setter TargetName="Label" Property="Foreground" Value="{StaticResource TextBrush}" />
+                                <Setter TargetName="Chrome" Property="BorderBrush" Value="{Binding Path=(themes:Theme.AccentSoft)}" />
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="#D90B0C0F" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -33,6 +61,9 @@
             <Button x:Name="CloseButton" Style="{StaticResource IconButton}" Content="&#xE8BB;" FontSize="10" Foreground="{StaticResource TextBrush}"
                     HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,10,10,0" ToolTip="Close"
                     AutomationProperties.Name="Close" Click="OnClose" />
+
+            <Button x:Name="DjButton" Style="{StaticResource DjChip}" Content="DJ" Tag="Off" HorizontalAlignment="Left" VerticalAlignment="Top"
+                    Margin="16,13,0,0" AutomationProperties.Name="DJ" Click="OnDj" />
 
             <StackPanel VerticalAlignment="Bottom" Margin="24,0,24,6">
                 <controls:Marquee Text="{Binding Title}" FontSize="21" FontWeight="SemiBold" FontFamily="{StaticResource DisplayFont}"
@@ -72,7 +103,7 @@
             </Ellipse>
             <Button Grid.Column="3" Style="{StaticResource TransportButton}" Content="&#xE893;" ToolTip="Next"
                     AutomationProperties.Name="Next" Click="OnNext" />
-            <Button Grid.Column="4" Style="{StaticResource TransportButton}" Content="&#xE8B1;" FontSize="13" HorizontalAlignment="Right"
+            <Button x:Name="ReshuffleButton" Grid.Column="4" Style="{StaticResource TransportButton}" Content="&#xE8B1;" FontSize="13" HorizontalAlignment="Right"
                     ToolTip="Reshuffle what's left" AutomationProperties.Name="Reshuffle" Click="OnReshuffle" />
         </Grid>
 

@@ -6,6 +6,7 @@ public sealed class QueueState
     public int Position { get; set; }
     public int Round { get; set; } = 1;
     public List<long> Pinned { get; set; } = [];
+    public List<long> Guests { get; set; } = [];
 }
 
 // One round plays every song exactly once. Only then is a new round shuffled.
@@ -16,6 +17,8 @@ public sealed class PlayQueue
     readonly Func<IReadOnlyCollection<long>, List<long>> shuffle;
     List<long> order = [];
     readonly List<long> pinned = [];
+    // DJ picks: they play between your songs but never become part of a round
+    readonly HashSet<long> guests = [];
 
     public PlayQueue(Func<IReadOnlyCollection<long>, List<long>> shuffle) => this.shuffle = shuffle;
 
@@ -30,10 +33,39 @@ public sealed class PlayQueue
     public IEnumerable<long> Upcoming => pinned.Concat(order.Skip(Position + 1).Where(id => !pinned.Contains(id)));
     public IEnumerable<long> History => order.Take(Math.Max(0, Position)).Reverse();
 
+    public bool IsGuest(long id) => guests.Contains(id);
+    public bool GuestAhead => order.Skip(Position + 1).Any(guests.Contains) || pinned.Any(guests.Contains);
+
+    public void InsertGuest(long id)
+    {
+        guests.Add(id);
+        if (order.Count == 0)
+        {
+            order.Add(id);
+            Position = 0;
+            return;
+        }
+        order.Remove(id);
+        order.Insert(Math.Min(Position + 1, order.Count), id);
+    }
+
+    public void RemoveUpcomingGuests()
+    {
+        for (int i = order.Count - 1; i > Position; i--)
+        {
+            if (guests.Contains(order[i]))
+            {
+                guests.Remove(order[i]);
+                order.RemoveAt(i);
+            }
+        }
+    }
+
     public void Start(IReadOnlyCollection<long> pool)
     {
         order = shuffle(pool);
         pinned.Clear();
+        guests.Clear();
         Position = 0;
         Round = 1;
     }
@@ -107,6 +139,7 @@ public sealed class PlayQueue
     public void Remove(long id)
     {
         pinned.Remove(id);
+        guests.Remove(id);
         int index = order.IndexOf(id);
         if (index < 0)
             return;
@@ -131,7 +164,7 @@ public sealed class PlayQueue
     {
         var wanted = new HashSet<long>(pool);
         var current = Current;
-        var kept = order.Where((id, i) => wanted.Contains(id) || i == Position).ToList();
+        var kept = order.Where((id, i) => wanted.Contains(id) || i == Position || (i > Position && guests.Contains(id))).ToList();
         Position = current is { } c ? kept.IndexOf(c) : 0;
         order = kept;
         pinned.RemoveAll(id => !wanted.Contains(id));
@@ -146,6 +179,8 @@ public sealed class PlayQueue
 
     void NewRound()
     {
+        order.RemoveAll(guests.Contains);
+        guests.Clear();
         var last = order.TakeLast(Math.Min(RoundSeam, order.Count / 3)).ToHashSet();
         var next = shuffle(order);
 
@@ -168,7 +203,7 @@ public sealed class PlayQueue
         Round++;
     }
 
-    public QueueState Save() => new() { Order = order.ToList(), Position = Position, Round = Round, Pinned = pinned.ToList() };
+    public QueueState Save() => new() { Order = order.ToList(), Position = Position, Round = Round, Pinned = pinned.ToList(), Guests = guests.ToList() };
 
     public void Restore(QueueState state)
     {
@@ -177,5 +212,7 @@ public sealed class PlayQueue
         Round = Math.Max(1, state.Round);
         pinned.Clear();
         pinned.AddRange(state.Pinned);
+        guests.Clear();
+        guests.UnionWith(state.Guests.Where(order.Contains));
     }
 }

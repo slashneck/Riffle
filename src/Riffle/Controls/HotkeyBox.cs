@@ -67,11 +67,11 @@ public sealed class HotkeyBox : Button
         var modifiers = Keyboard.Modifiers;
         if (Keyboard.IsKeyDown(Key.LWin) || Keyboard.IsKeyDown(Key.RWin))
             modifiers |= ModifierKeys.Windows;
-        // a plain letter would stop working everywhere else, so those need Ctrl, Alt or Shift
-        bool function = key is >= Key.F1 and <= Key.F24;
-        if (modifiers == ModifierKeys.None && !function)
+        // a plain letter would stop working everywhere else, so those need Ctrl, Alt or Shift.
+        // The numpad, F-keys, Pause and Scroll Lock are fine on their own.
+        if (modifiers == ModifierKeys.None && !Hotkey.WorksAlone(key))
         {
-            Content = "Add Ctrl, Alt or Shift";
+            Content = "Use the numpad, an F-key, or add Ctrl";
             return;
         }
         Stop();

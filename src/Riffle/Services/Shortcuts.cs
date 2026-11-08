@@ -38,8 +38,36 @@ public readonly record struct Hotkey(ModifierKeys Modifiers, Key Key)
         return string.Join("+", parts);
     }
 
-    // The same, but the way people read a key: 1 instead of D1.
-    public string Label => ToString().Replace("+D", "+").Replace("Oem", "").Replace("Next", "PageDown").Replace("Prior", "PageUp");
+    // The same, but the way people read a key: 1 instead of D1, Num 4 instead of NumPad4.
+    public string Label
+    {
+        get
+        {
+            var name = Key switch
+            {
+                >= Key.NumPad0 and <= Key.NumPad9 => "Num " + (Key - Key.NumPad0),
+                Key.Multiply => "Num *",
+                Key.Add => "Num +",
+                Key.Subtract => "Num -",
+                Key.Divide => "Num /",
+                Key.Decimal => "Num .",
+                >= Key.D0 and <= Key.D9 => ((int)(Key - Key.D0)).ToString(),
+                Key.Next => "PageDown",
+                Key.Prior => "PageUp",
+                Key.Scroll => "Scroll Lock",
+                _ => Key.ToString().Replace("Oem", ""),
+            };
+            var full = new Hotkey(Modifiers, Key).ToString();
+            int cut = full.LastIndexOf('+');
+            return cut < 0 ? name : full[..(cut + 1)] + name;
+        }
+    }
+
+    // Keys no game or text box needs on their own, so they work without Ctrl, Alt or Shift.
+    public static bool WorksAlone(Key key) => key is >= Key.F1 and <= Key.F24
+        or >= Key.NumPad0 and <= Key.NumPad9
+        or Key.Multiply or Key.Add or Key.Subtract or Key.Divide or Key.Decimal
+        or Key.Pause or Key.Scroll;
 }
 
 // Global hotkeys. None are set until someone picks one in Settings.

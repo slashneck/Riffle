@@ -75,7 +75,7 @@ public partial class App : Application
         main.AttachUpdates(new UpdateService(() => player.CheckForUpdates, () => player.IsPlaying, Quit));
 
         overlay = new OverlayWindow(player);
-        shortcuts = new Shortcuts(new WindowInteropHelper(main).Handle, settings, new Dictionary<string, Action>
+        shortcuts = new Shortcuts(new WindowInteropHelper(main).EnsureHandle(), settings, new Dictionary<string, Action>
         {
             ["Show"] = overlay.ShowBriefly,
             ["Toggle"] = player.Toggle,

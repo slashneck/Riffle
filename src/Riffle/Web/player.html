@@ -262,6 +262,23 @@ const commands = {
   },
 
   cancelCollect({ id }) { cancelled.add(id); },
+
+  // the details of one song, for the DJ to judge it before it ever plays
+  async describe({ id, url }) {
+    const made = createWidget(url);
+    made.frame.dataset.collect = '1';
+    const ready = await new Promise(resolve => {
+      const timer = setTimeout(() => resolve(false), 20000);
+      made.widget.bind(Events.READY, () => { clearTimeout(timer); resolve(true); });
+    });
+    let sound = null;
+    if (ready) {
+      made.widget.setVolume(0);
+      sound = meta(await ask(made.widget, 'getCurrentSound'));
+    }
+    made.frame.remove();
+    post({ t: 'described', id, sound });
+  },
 };
 
 const cancelled = new Set();

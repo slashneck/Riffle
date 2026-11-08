@@ -80,6 +80,10 @@ public sealed class Player : INotifyPropertyChanged, IDisposable
     string? notice;
     DateTime? sleepAt;
     string? listenLabel;
+    readonly Dj dj;
+    readonly Dictionary<long, string> pickReasons = [];
+    int sinceDj;
+    bool picking, waitingForPick;
 
     public Player(Settings settings, Library library, PlayerHost host, SynchronizationContext ui)
     {
@@ -100,6 +104,7 @@ public sealed class Player : INotifyPropertyChanged, IDisposable
         }
 
         Theme.Still = settings.UltraPerformance;
+        dj = new Dj(library, host, settings, ReadTrack);
         slowLoad.Tick += (_, _) => { slowLoad.Stop(); SetLoadingSlowly(true); };
 
         if (library.Queue is { Order.Count: > 0 } state)
@@ -161,7 +166,10 @@ public sealed class Player : INotifyPropertyChanged, IDisposable
     public bool IsSleeping => sleepAt is not null;
     public string SleepLabel => sleepAt is { } at ? $"Stops in {Math.Max(1, (int)Math.Ceiling((at - DateTime.Now).TotalMinutes))} min" : "Sleep timer";
 
-    public string RoundLabel => queue.Count == 0 ? "" : $"Round {queue.Round}  ·  {RoundPlayed:N0} of {queue.Count:N0}";
+    public string RoundLabel => IsPick && settings.DjReasons && PickReason is { } reason ? "DJ  ·  " + reason
+        : IsPick ? "DJ pick"
+        : DjRaw && settings.DjOn ? "DJ"
+        : queue.Count == 0 ? "" : $"Round {queue.Round}  ·  {RoundPlayed:N0} of {queue.Count:N0}";
     public string NowFrom => listenLabel ?? "";
 
     public Library.Pool SelectionPool => Library.BuildPool(Library.Selected, settings.CatchReuploads, settings.LongestMinutes);
@@ -269,6 +277,202 @@ public sealed class Player : INotifyPropertyChanged, IDisposable
             ArtChanged?.Invoke();
             Changed();
         }
+    }
+
+    // ---- DJ ----
+
+    public bool DjOn
+    {
+        get => settings.DjOn;
+        set
+        {
+            settings.DjOn = value;
+            settings.Save();
+            if (!value)
+            {
+                waitingForPick = false;
+                queue.RemoveUpcomingGuests();
+                preloaded = null;
+                AfterQueueEdit();
+                if (playing)
+                    PreloadNext();
+            }
+            else
+            {
+                // the first pick comes right after this song, so you hear it's on
+                sinceDj = Math.Max(sinceDj, DjBrain.Gap(settings.DjAmount));
+                if (playing)
+                    _ = ScheduleGuestAsync();
+            }
+            Changed();
+            Changed(nameof(RoundLabel));
+        }
+    }
+
+    public string DjAmount
+    {
+        get => settings.DjAmount;
+        set
+        {
+            settings.DjAmount = value;
+            settings.Save();
+            Changed();
+            Changed(nameof(RoundLabel));
+            if (settings.DjOn && playing)
+                _ = ScheduleGuestAsync();
+        }
+    }
+
+    public double DjNewShare
+    {
+        get => settings.DjNewShare;
+        set { settings.DjNewShare = Math.Clamp(value, 0, 1); settings.Save(); Changed(); }
+    }
+
+    public bool DjReasons
+    {
+        get => settings.DjReasons;
+        set { settings.DjReasons = value; settings.Save(); Changed(); Changed(nameof(RoundLabel)); }
+    }
+
+    // Raw: only picks, from what you've listened to, when asked for or when nothing is selected.
+    bool DjRaw => settings.DjAmount == "Raw" || Library.Selected.Count == 0;
+
+    public bool IsPick => current is not null && queue.IsGuest(current.Id);
+    public string? PickReason => current is not null && pickReasons.TryGetValue(current.Id, out var reason) ? reason : null;
+    public bool IsKept => current is not null && Library.Sources.FirstOrDefault(s => s.Url == Library.DjFindsUrl)?.Tracks.Contains(current.Id) == true;
+
+    public void StartDj()
+    {
+        queue.Start([]);
+        listenLabel = "DJ";
+        Changed(nameof(NowFrom));
+        sinceDj = 0;
+        waitingForPick = true;
+        ShowNotice("The DJ is picking");
+        AfterQueueEdit();
+        _ = ScheduleGuestAsync();
+    }
+
+    async Task ScheduleGuestAsync()
+    {
+        if (!settings.DjOn || picking || queue.GuestAhead)
+            return;
+        bool raw = DjRaw;
+        if (!waitingForPick && sinceDj < (raw ? 0 : DjBrain.Gap(settings.DjAmount)))
+            return;
+
+        picking = true;
+        try
+        {
+            var pool = SelectionPool.Tracks;
+            var exclude = pool.Select(t => t.Id).Concat(queue.Order).ToHashSet();
+            var seedsFrom = raw ? Listened() : pool;
+            var pick = await dj.PickAsync(seedsFrom, current, exclude);
+            if (pick is null)
+            {
+                if (waitingForPick)
+                    ShowNotice("The DJ couldn't find anything right now");
+                return;
+            }
+            if (!settings.DjOn || queue.GuestAhead)
+                return;
+
+            queue.InsertGuest(pick.Track.Id);
+            pickReasons[pick.Track.Id] = pick.Reason;
+            preloaded = null;
+            Library.Save();
+            AfterQueueEdit();
+            if (waitingForPick)
+            {
+                waitingForPick = false;
+                if (queue.Current != pick.Track.Id)
+                    queue.Advance();
+                PlayCurrent(0);
+                AfterAdvance();
+            }
+            else if (playing)
+            {
+                PreloadNext();
+            }
+        }
+        finally
+        {
+            picking = false;
+        }
+    }
+
+    // What raw mode starts from: songs you've played and kept, or your whole library before that.
+    List<Track> Listened()
+    {
+        var finds = Library.Sources.FirstOrDefault(s => s.Url == Library.DjFindsUrl)?.Tracks ?? [];
+        var heard = Library.Plays.Keys.Concat(finds).Where(Library.Tracks.ContainsKey).Select(id => Library.Tracks[id]).ToList();
+        return heard.Count >= 5 ? heard : Library.Sources.SelectMany(s => s.Tracks).Distinct().Where(Library.Tracks.ContainsKey).Select(id => Library.Tracks[id]).ToList();
+    }
+
+    void AfterSongStarted()
+    {
+        if (current is null)
+            return;
+        if (queue.IsGuest(current.Id))
+            sinceDj = 0;
+        else
+            sinceDj++;
+        Changed(nameof(IsPick));
+        Changed(nameof(PickReason));
+        Changed(nameof(IsKept));
+        Changed(nameof(RoundLabel));
+        _ = ScheduleGuestAsync();
+    }
+
+    // A song left within its first 30 seconds counts as skipped.
+    void NoteSkip()
+    {
+        if (current is not { } track || !playing || loading || position >= 30000)
+            return;
+        Library.Skips[track.Id] = Library.Skips.GetValueOrDefault(track.Id) + 1;
+        if (queue.IsGuest(track.Id))
+            dj.Learn(track, DjLesson.Skip);
+    }
+
+    public void KeepCurrent()
+    {
+        if (current is not { } track)
+            return;
+        var finds = Library.Sources.FirstOrDefault(s => s.Url == Library.DjFindsUrl);
+        if (finds is null)
+        {
+            finds = new Source { Url = Library.DjFindsUrl, Title = "DJ finds", Owner = "Riffle", Synced = DateTime.UtcNow };
+            Library.Sources.Add(finds);
+            Tiles.Add(new SourceTile(finds));
+        }
+        if (!finds.Tracks.Contains(track.Id))
+        {
+            finds.Tracks.Insert(0, track.Id);
+            finds.Art = track.Art ?? finds.Art;
+            dj.Learn(track, DjLesson.Keep);
+        }
+        Tiles.FirstOrDefault(t => t.Source == finds)?.Refresh();
+        Library.Save();
+        Changed(nameof(IsKept));
+        ShowNotice("Kept in DJ finds");
+    }
+
+    // ---- blocked songs ----
+
+    public IReadOnlyList<BlockedSong> BlockedSongs => Library.NeverPlay
+        .Select(id => Library.Tracks.TryGetValue(id, out var t) ? new BlockedSong(id, t.Title, t.Artist) : new BlockedSong(id, "A song no longer in your library", ""))
+        .OrderBy(b => b.Title, StringComparer.CurrentCultureIgnoreCase)
+        .ToList();
+
+    public void Allow(long id)
+    {
+        if (!Library.NeverPlay.Remove(id))
+            return;
+        Library.Save();
+        Changed(nameof(NeverCount));
+        SelectionChanged();
+        RefreshPool();
     }
 
     public bool OverlayOnChange
@@ -391,7 +595,7 @@ public sealed class Player : INotifyPropertyChanged, IDisposable
         foreach (var tile in Tiles.ToList())
         {
             var source = tile.Source;
-            if (collecting.ContainsKey(source.Id))
+            if (collecting.ContainsKey(source.Id) || source.Url.StartsWith("riffle:", StringComparison.Ordinal))
                 continue;
 
             var (title, _, picture) = await ArtworkService.DescribeAsync(source.Url, CancellationToken.None);
@@ -571,6 +775,7 @@ public sealed class Player : INotifyPropertyChanged, IDisposable
         watchdog.Start();
         SetLoading(true);
         Host.Send(new { cmd = "play", id, url = Url(track), fade, at });
+        AfterSongStarted();
     }
 
     void SetCurrent(Track track)
@@ -653,7 +858,10 @@ public sealed class Player : INotifyPropertyChanged, IDisposable
             return;
         if (current is null || queue.Count == 0)
         {
-            ShuffleSelection();
+            if (settings.DjOn && DjRaw)
+                StartDj();
+            else
+                ShuffleSelection();
             return;
         }
         if (engineHasTrack)
@@ -673,6 +881,14 @@ public sealed class Player : INotifyPropertyChanged, IDisposable
     {
         if (queue.Count == 0)
             return;
+        NoteSkip();
+        if (settings.DjOn && DjRaw && queue.PeekNext() is null)
+        {
+            waitingForPick = true;
+            ShowNotice("The DJ is picking");
+            _ = ScheduleGuestAsync();
+            return;
+        }
         queue.Advance();
         PlayCurrent(settings.Crossfade > 0 ? ManualFade : 0);
         AfterAdvance();
@@ -706,6 +922,8 @@ public sealed class Player : INotifyPropertyChanged, IDisposable
 
     public void NeverPlay(long id)
     {
+        if (queue.IsGuest(id) && Library.Tracks.TryGetValue(id, out var picked))
+            dj.Learn(picked, DjLesson.Block);
         Library.NeverPlay.Add(id);
         bool isCurrent = current?.Id == id;
         queue.Remove(id);
@@ -717,6 +935,7 @@ public sealed class Player : INotifyPropertyChanged, IDisposable
         AfterQueueEdit();
         Library.Save();
         Changed(nameof(NeverCount));
+        SelectionChanged();
         ShowNotice("Won't play again");
     }
 
@@ -809,6 +1028,9 @@ public sealed class Player : INotifyPropertyChanged, IDisposable
             case "collect-failed":
                 FinishCollect(m.GetProperty("id").GetString()!, false);
                 break;
+            case "described":
+                dj.OnDescribed(m.GetProperty("id").GetString()!, m);
+                break;
         }
     }
 
@@ -828,6 +1050,7 @@ public sealed class Player : INotifyPropertyChanged, IDisposable
         TimeChanged();
         AfterAdvance();
         PreloadNext();
+        AfterSongStarted();
     }
 
     void OnPlaying(JsonElement m)
@@ -870,6 +1093,7 @@ public sealed class Player : INotifyPropertyChanged, IDisposable
         if (!counted && position > Math.Min(30000, duration * 0.5))
         {
             counted = true;
+            Library.LastPlayed[current.Id] = DateTime.UtcNow;
             Library.Plays[current.Id] = Library.Plays.GetValueOrDefault(current.Id) + 1;
             Library.TotalPlays++;
             Library.TotalMinutes += current.Seconds / 60.0;
@@ -898,6 +1122,15 @@ public sealed class Player : INotifyPropertyChanged, IDisposable
         // the next song is already on its way in
         if (current?.Id != id || !playing || blending is not null)
             return;
+        if (settings.DjOn && DjRaw && queue.PeekNext() is null)
+        {
+            // the next pick is still on its way: it starts as soon as it's found
+            watchdog.Stop();
+            waitingForPick = true;
+            ShowNotice("The DJ is picking");
+            _ = ScheduleGuestAsync();
+            return;
+        }
         queue.Advance();
         PlayCurrent(0);
         AfterAdvance();
@@ -1031,7 +1264,7 @@ public sealed class Player : INotifyPropertyChanged, IDisposable
         Tiles.Remove(tile);
         Library.Sources.Remove(tile.Source);
         Library.Selected.Remove(tile.Source.Id);
-        var used = Library.Sources.SelectMany(s => s.Tracks).ToHashSet();
+        var used = Library.Sources.SelectMany(s => s.Tracks).Concat(Library.NeverPlay).Concat(Library.Plays.Keys).Concat(Library.DjPicks.Keys).Concat(queue.Order).ToHashSet();
         foreach (var id in Library.Tracks.Keys.Where(id => !used.Contains(id)).ToList())
             Library.Tracks.Remove(id);
         foreach (var mix in Library.Mixes)
@@ -1158,7 +1391,7 @@ public sealed class Player : INotifyPropertyChanged, IDisposable
     public async Task SyncAsync(SourceTile tile, bool manual = false)
     {
         var source = tile.Source;
-        if (collecting.ContainsKey(source.Id))
+        if (collecting.ContainsKey(source.Id) || source.Url.StartsWith("riffle:", StringComparison.Ordinal))
             return;
 
         tile.Status = "Waiting";
@@ -1316,3 +1549,5 @@ public sealed class Player : INotifyPropertyChanged, IDisposable
         media?.Dispose();
     }
 }
+
+public sealed record BlockedSong(long Id, string Title, string Artist);

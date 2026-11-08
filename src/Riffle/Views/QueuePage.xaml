@@ -47,7 +47,13 @@
                         <Border Width="40" Height="40" CornerRadius="6" controls:Cover.Pixels="80" controls:Cover.Url="{Binding Art}" />
                         <StackPanel Grid.Column="1" Margin="11,0,8,0" VerticalAlignment="Center">
                             <TextBlock Text="{Binding Title}" FontSize="12.5" TextTrimming="CharacterEllipsis" />
-                            <TextBlock Text="{Binding Artist}" FontSize="11" Foreground="{StaticResource MutedTextBrush}" TextTrimming="CharacterEllipsis" Margin="0,1,0,0" />
+                            <StackPanel Orientation="Horizontal" Margin="0,1,0,0">
+                                <Border CornerRadius="4" Background="{StaticResource ChipHoverBrush}" Padding="5,0,5,1" Margin="0,0,6,0" VerticalAlignment="Center"
+                                        Visibility="{Binding Pick, Converter={StaticResource Visible}}">
+                                    <TextBlock Text="DJ" FontSize="9.5" FontWeight="SemiBold" Foreground="{StaticResource SubtleTextBrush}" />
+                                </Border>
+                                <TextBlock Text="{Binding Artist}" FontSize="11" Foreground="{StaticResource MutedTextBrush}" TextTrimming="CharacterEllipsis" Margin="0,1,0,0" />
+                            </StackPanel>
                         </StackPanel>
                         <Grid Grid.Column="2" VerticalAlignment="Center">
                             <TextBlock x:Name="Length" Text="{Binding Length}" FontSize="11" Foreground="{StaticResource MutedTextBrush}"

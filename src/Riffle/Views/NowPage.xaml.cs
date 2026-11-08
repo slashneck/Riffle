@@ -38,6 +38,7 @@ public partial class NowPage : UserControl
         UpdateStatus();
         UpdateSleep();
         UpdateStill();
+        UpdateDj();
     }
 
     void OnChanged(object? sender, PropertyChangedEventArgs e)
@@ -54,6 +55,12 @@ public partial class NowPage : UserControl
                 break;
             case nameof(Player.UltraPerformance):
                 UpdateStill();
+                break;
+            case nameof(Player.DjOn):
+            case nameof(Player.DjAmount):
+            case nameof(Player.IsPick):
+            case nameof(Player.IsKept):
+                UpdateDj();
                 break;
             case nameof(Player.Volume):
                 UpdateVolume();
@@ -131,7 +138,30 @@ public partial class NowPage : UserControl
     void OnNext(object sender, RoutedEventArgs e) => player.Next();
     void OnPrevious(object sender, RoutedEventArgs e) => player.Previous();
     void OnNever(object sender, RoutedEventArgs e) => player.NeverPlayCurrent();
-    void OnReshuffle(object sender, RoutedEventArgs e) => player.Reshuffle();
+    void UpdateDj()
+    {
+        DjButton.Tag = player.DjOn ? "On" : "Off";
+        DjButton.Content = player.DjOn ? $"DJ  ·  {player.DjAmount}" : "DJ";
+        DjButton.ToolTip = player.DjOn
+            ? "The DJ is mixing in songs you know but haven't heard in a while, and new ones. Click to turn it off."
+            : "Turn on the DJ: it mixes songs you know but haven't heard in a while, and new ones, into your shuffle";
+
+        // on a DJ pick, the last button keeps it instead of reshuffling
+        bool pick = player.IsPick;
+        ReshuffleButton.Content = pick ? (player.IsKept ? "\uE73E" : "\uE710") : "\uE8B1";
+        ReshuffleButton.ToolTip = pick ? (player.IsKept ? "Kept in DJ finds" : "Keep this in DJ finds") : "Reshuffle what's left";
+        AutomationProperties.SetName(ReshuffleButton, pick ? "Keep" : "Reshuffle");
+    }
+
+    void OnDj(object sender, RoutedEventArgs e) => player.DjOn = !player.DjOn;
+
+    void OnReshuffle(object sender, RoutedEventArgs e)
+    {
+        if (player.IsPick)
+            player.KeepCurrent();
+        else
+            player.Reshuffle();
+    }
 
     void OnSleep(object sender, RoutedEventArgs e)
     {
