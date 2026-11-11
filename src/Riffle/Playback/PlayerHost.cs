@@ -44,8 +44,7 @@ public sealed partial class PlayerHost : IDisposable
 
     public async Task StartAsync()
     {
-        window.Show();
-        Native.AddExStyle(new WindowInteropHelper(window).Handle, Native.WS_EX_TOOLWINDOW | Native.WS_EX_NOACTIVATE);
+        ShowHidden(window);
 
         // Cache turned down to nothing so songs don't end up on disk.
         var options = new CoreWebView2EnvironmentOptions(
@@ -125,6 +124,15 @@ public sealed partial class PlayerHost : IDisposable
             waiting.Add(json);
     }
 
+    // Styled before it first appears, so these windows can never take focus from a game.
+    static void ShowHidden(Window hidden)
+    {
+        hidden.ShowActivated = false;
+        hidden.SourceInitialized += (_, _) =>
+            Native.AddExStyle(new WindowInteropHelper(hidden).Handle, Native.WS_EX_TOOLWINDOW | Native.WS_EX_NOACTIVATE);
+        hidden.Show();
+    }
+
     public async Task<bool> IsSignedInAsync()
     {
         if (view.CoreWebView2 is not { } web)
@@ -148,8 +156,7 @@ public sealed partial class PlayerHost : IDisposable
             ShowInTaskbar = false, ShowActivated = false, WindowStartupLocation = WindowStartupLocation.Manual,
             Content = scanner, Title = "Riffle account",
         };
-        host.Show();
-        Native.AddExStyle(new WindowInteropHelper(host).Handle, Native.WS_EX_TOOLWINDOW | Native.WS_EX_NOACTIVATE);
+        ShowHidden(host);
 
         try
         {
@@ -190,8 +197,7 @@ public sealed partial class PlayerHost : IDisposable
             ShowInTaskbar = false, ShowActivated = false, WindowStartupLocation = WindowStartupLocation.Manual,
             Content = scanner, Title = "Riffle DJ",
         };
-        host.Show();
-        Native.AddExStyle(new WindowInteropHelper(host).Handle, Native.WS_EX_TOOLWINDOW | Native.WS_EX_NOACTIVATE);
+        ShowHidden(host);
 
         try
         {
@@ -244,8 +250,7 @@ public sealed partial class PlayerHost : IDisposable
             ShowInTaskbar = false, ShowActivated = false, WindowStartupLocation = WindowStartupLocation.Manual,
             Content = scanner, Title = "Riffle import",
         };
-        host.Show();
-        Native.AddExStyle(new WindowInteropHelper(host).Handle, Native.WS_EX_TOOLWINDOW | Native.WS_EX_NOACTIVATE);
+        ShowHidden(host);
 
         try
         {

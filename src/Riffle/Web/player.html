@@ -91,8 +91,19 @@ class Deck {
   // resolves true once it's really audibly going
   start() {
     return new Promise(resolve => {
-      const timer = setTimeout(() => { this.onPlay = null; resolve(false); }, 9000);
-      this.onPlay = () => { clearTimeout(timer); resolve(true); };
+      if (this.cancelStart) this.cancelStart();
+      const nudge = setInterval(() => this.widget.play(), 3000);
+      const timer = setTimeout(() => stop(false), 20000);
+      const stop = ok => {
+        clearInterval(nudge);
+        clearTimeout(timer);
+        if (this.onPlay === started) this.onPlay = null;
+        this.cancelStart = null;
+        resolve(ok);
+      };
+      const started = () => stop(true);
+      this.onPlay = started;
+      this.cancelStart = () => stop(false);
       this.widget.play();
     });
   }
@@ -104,6 +115,8 @@ let fading = false;
 let isPlaying = false;
 let fadeRun = 0;
 let standbyLoad = Promise.resolve(false);
+let starting = 0;
+let waitingPreload = null;
 let requestToken = 0;
 
 const standby = () => decks[1 - active];
@@ -136,6 +149,7 @@ function finishFadeNow() {
 
 const commands = {
   async preload({ url, id }) {
+    if (starting) { waitingPreload = { url, id }; return; }
     const deck = standby();
     if (deck.id === id && deck.ready) { post({ t: 'preloaded', id }); return; }
     deck.level = 0;
@@ -143,11 +157,29 @@ const commands = {
     if (await standbyLoad) post({ t: 'preloaded', id });
   },
 
-  async play({ url, id, fade, at }) {
+  async play(request) {
+    starting++;
+    try {
+      await commands.startSong(request);
+    } finally {
+      starting--;
+      if (!starting && waitingPreload) {
+        const next = waitingPreload;
+        waitingPreload = null;
+        commands.preload(next);
+      }
+    }
+  },
+
+  async startSong({ url, id, fade, at }) {
     const token = ++requestToken;
     const from = decks[active];
     const to = standby();
     finishFadeNow();
+
+    // one load at a time on a deck, a second one can leave it holding the wrong song
+    await standbyLoad;
+    if (token !== requestToken) return;
 
     if (to.id !== id || !to.ready) {
       to.level = 0;
@@ -160,7 +192,18 @@ const commands = {
     }
     if (token !== requestToken) return;
 
-    const sound = meta(await ask(to.widget, 'getCurrentSound'));
+    let sound = meta(await ask(to.widget, 'getCurrentSound'));
+    if (token !== requestToken) return;
+    if (sound && sound.id !== id) {
+      to.level = 0;
+      to.apply();
+      const again = to.load(url, id);
+      standbyLoad = again;
+      if (!await again) { if (token === requestToken) post({ t: 'failed', id, why: 'load' }); return; }
+      if (token !== requestToken) return;
+      sound = meta(await ask(to.widget, 'getCurrentSound'));
+      if (token !== requestToken) return;
+    }
     if (sound && (sound.preview || sound.policy === 'BLOCK' || sound.policy === 'SNIP')) {
       to.id = null;
       post({ t: 'failed', id, why: 'preview' });
@@ -196,7 +239,7 @@ const commands = {
       });
       if (!halfway) post({ t: 'halfway', id });
       if (finished) { fading = false; from.widget.pause(); from.level = 1; }
-      else { from.widget.pause(); }
+      else if (token === requestToken) { from.widget.pause(); }
     } else if (from.widget && from !== to) {
       from.widget.pause();
     }

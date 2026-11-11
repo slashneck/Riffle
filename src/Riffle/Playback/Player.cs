@@ -1168,6 +1168,8 @@ public sealed class Player : INotifyPropertyChanged, IDisposable
             ShowNotice("Can't reach SoundCloud right now");
             return;
         }
+        if (Library.Tracks.TryGetValue(id, out var skipped))
+            ShowNotice($"Couldn't play {skipped.Title}, skipped it");
         PlayCurrent(0);
         AfterAdvance();
     }
@@ -1177,7 +1179,8 @@ public sealed class Player : INotifyPropertyChanged, IDisposable
         // nothing from the player for a long while: move on rather than sit in silence
         if (playing || loading)
         {
-            if (Environment.TickCount64 - lastProgress > 25000 && current is { } track)
+            // a song that's still loading gets longer than one that went quiet
+            if (Environment.TickCount64 - lastProgress > (loading ? 60000 : 25000) && current is { } track)
                 OnFailed(track.Id, "stalled");
         }
     }
