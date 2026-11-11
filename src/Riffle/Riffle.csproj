@@ -13,7 +13,7 @@
     <ApplicationIcon>Assets\riffle.ico</ApplicationIcon>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
 
-    <Version>1.2.0</Version>
+    <Version>1.2.1</Version>
     <Product>Riffle</Product>
     <AssemblyTitle>Riffle</AssemblyTitle>
     <Description>A true shuffle for your SoundCloud</Description>

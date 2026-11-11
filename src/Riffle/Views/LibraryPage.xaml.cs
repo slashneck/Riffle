@@ -59,12 +59,12 @@ public partial class LibraryPage : UserControl
     {
         switch (e.PropertyName)
         {
-            case nameof(Player.ShuffleLabel):
-            case nameof(Player.SelectionDetail):
             case nameof(Player.UltraPerformance):
                 Tiles.ItemsSource = null;
                 Tiles.ItemsSource = player.Tiles;
                 break;
+            case nameof(Player.ShuffleLabel):
+            case nameof(Player.SelectionDetail):
             case nameof(Player.SignedIn):
             case nameof(Player.AccountName):
             case nameof(Player.Mixes):
